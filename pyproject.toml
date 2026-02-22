@@ -1,0 +1,85 @@
+[build-system]
+requires = ["scikit-build-core", "pybind11", "setuptools-scm>=8", "pybind11-stubgen"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "tileon"
+dynamic = ["version"]
+description = "A language and compiler for custom high-performance kernels."
+authors = [
+    { name = "zlx", email = "zlx@tensorplay.cn" },
+]
+readme = "README.md"
+license = { text = "MIT" }
+keywords = ["Compiler", "Deep Learning", "High-Performance"]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=2.0.0",
+    "typing-extensions>=4.5.0",
+]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "Topic :: Education",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+
+[project.urls]
+Homepage = "https://github.com/bluemoon-o2/tileon"
+Repository = "https://github.com/bluemoon-o2/tileon.git"
+Issues = "https://github.com/bluemoon-o2/tileon/issues"
+Changelog = "https://github.com/bluemoon-o2/tileon/blob/main/CHANGELOG.md"
+Documentation = "https://bluemoon-o2.github.io/tileon/"
+Contributing = "https://github.com/bluemoon-o2/tileon/blob/main/CONTRIBUTING.md"
+
+[project.optional-dependencies]
+dev = [
+    "black>=23.3.0",
+    "twine>=4.0.2",
+    "mkdocs>=1.4.3",
+    "mkdocstrings[python]>=0.22.0",
+    "mkdocs-material>=9.1.18",
+    "pytest>=7.4.0",
+    "pre-commit>=4.5.0"
+]
+all = [
+    "tileon[dev]",
+]
+
+[tool.scikit-build-core]
+logging.level = "info"
+wheel.packages = ["python/tileon"]
+cmake.verbose = true
+cmake.args = ["-G Ninja"]
+cmake.build-type = "Release"
+cmake.minimum-version = "3.21"
+minimum-version = "0.5.1"
+sdist.exclude = [
+    ".git",
+    ".gitignore",
+    "build/",
+]
+build.verbose = true
+
+[tool.scikit-build]
+metadata.version.provider = "scikit_build_core.metadata.setuptools_scm"
+sdist.include = ["python/tileon/_version.py"]
+
+[tool.setuptools_scm]
+write_to = "python/tileon/_version.py"
+version_scheme = "release-branch-semver"
+local_scheme = "no-local-version"
+fallback_version = "0.0.1.dev0"

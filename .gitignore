@@ -1,0 +1,13 @@
+.ruff_cache/
+
+python/tileon/_version.py
+
+*.pyc
+*.pyd
+
+*.egg-info/
+
+test/figures/
+
+
+third_party/

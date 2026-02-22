@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Community help
+    url: https://github.com/bluemoon-o2/tileon/issues
+    about: Tileon GitHub issues for help and discussions

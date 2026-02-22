@@ -1,0 +1,28 @@
+# CODEOWNERS for Tileon
+# These owners will be the default owners for everything in the repo.
+# When someone opens a pull request, the matching owners will be requested for review.
+
+# Default owner for everything
+*       @bluemoon-o2
+
+# --------
+# Docs
+# --------
+docs/       @bluemoon-o2
+
+# --------
+# Python
+# --------
+python/     @bluemoon-o2
+
+# --------
+# C++
+# --------
+include/    @bluemoon-o2
+lib/        @bluemoon-o2
+python/src/ @bluemoon-o2
+
+# --------
+# Third-party
+# --------
+third_party/    @bluemoon-o2
