@@ -9,25 +9,29 @@ from tileon._C import ir as _ir
 
 TORCH_MIN_ACCURACY = 90.0
 
+
 def get_torch_dtype(tl_dtype):
     try:
         name = tl_dtype.name
     except AttributeError:
         # Fallback if name is not available directly
         name = str(tl_dtype)
-        
+
     if 'float32' in name or 'fp32' in name: return torch.float32
     if 'float16' in name or 'fp16' in name: return torch.float16
     if 'bfloat16' in name or 'bf16' in name: return torch.bfloat16
     if 'float64' in name or 'fp64' in name: return torch.float64
-    
+
     # Check more specific names first to avoid partial matches
-    if 'float8e4b8' in name or 'fp8e4b8' in name: return getattr(torch, 'float8_e4m3fnuz', None)
-    if 'float8e5b16' in name or 'fp8e5b16' in name: return getattr(torch, 'float8_e5m2fnuz', None)
+    if 'float8e4b8' in name or 'fp8e4b8' in name:
+        return getattr(torch, 'float8_e4m3fnuz', None)
+    if 'float8e5b16' in name or 'fp8e5b16' in name:
+        return getattr(torch, 'float8_e5m2fnuz', None)
     if 'float8e4nv' in name or 'fp8e4nv' in name: return torch.float8_e4m3fn
     if 'float8e5' in name or 'fp8e5' in name: return torch.float8_e5m2
-    
+
     return None
+
 
 def _convert_float_original(input, input_dtype: tl.dtype, output_dtype: tl.dtype, rounding_mode):
     """
@@ -95,16 +99,17 @@ def _convert_float_original(input, input_dtype: tl.dtype, output_dtype: tl.dtype
         exponent_output << output_dtype.fp_mantissa_width) | significand_output
     return output.reshape(input.shape)
 
+
 def get_dtypes_to_test():
     dtypes = []
     dtypes.append(tl.float32)
     dtypes.append(tl.float16)
     dtypes.append(tl.bfloat16)
     dtypes.append(tl.float64)
-    
+
     for name in ['float8e5', 'float8e4nv', 'float8e4b8', 'float8e4b15', 'float8e5b16']:
         dtypes.append(getattr(tl, name))
-            
+
     # Create pairs (src, dst)
     pairs = []
     for src in dtypes:
@@ -112,8 +117,9 @@ def get_dtypes_to_test():
             if src == dst: continue
             # Filter out incompatible conversions if any known constraints
             pairs.append((src, dst))
-            
+
     return pairs
+
 
 def analyze_mismatch(ref_flat, act_flat, dtype):
     """
@@ -123,27 +129,27 @@ def analyze_mismatch(ref_flat, act_flat, dtype):
     total = ref_flat.size
     diff_mask = ref_flat != act_flat
     error_count = np.sum(diff_mask)
-    
+
     if error_count == 0:
         return {'status': 'PASS', 'accuracy': 100.0}
-        
+
     accuracy = 100.0 * (1.0 - (error_count / total))
-    
+
     # Bit analysis
     width = dtype.primitive_bitwidth
     mantissa_width = dtype.fp_mantissa_width
     # exponent_width = width - mantissa_width - 1 (sign bit)
-    
+
     diff_bits = ref_flat[diff_mask] ^ act_flat[diff_mask]
-    
+
     sign_mask = 1 << (width - 1)
     mantissa_mask = (1 << mantissa_width) - 1
     exponent_mask = ((1 << width) - 1) ^ (sign_mask | mantissa_mask)
-    
+
     sign_errors = np.sum((diff_bits & sign_mask) != 0)
     exponent_errors = np.sum((diff_bits & exponent_mask) != 0)
     mantissa_errors = np.sum((diff_bits & mantissa_mask) != 0)
-    
+
     return {
         'status': f"FAIL ({error_count})",
         'accuracy': accuracy,
@@ -153,23 +159,49 @@ def analyze_mismatch(ref_flat, act_flat, dtype):
         'mantissa_errors': mantissa_errors
     }
 
+
 def benchmark_all():
     pairs = get_dtypes_to_test()
     print(f"Found {len(pairs)} conversion pairs to test.")
-    
+
     results = []
-    
+
     for src, dst in pairs:
         res = benchmark_pair(src, dst)
         if res:
             results.append(res)
-            
+
     # Aggregation stats
     agg_stats = {
-        'C++': {'time': 0.0, 'count': 0, 'acc_sum': 0.0, 'acc_count': 0, 'na_count': 0},
-        'Py': {'time': 0.0, 'count': 0, 'acc_sum': 0.0, 'acc_count': 0, 'na_count': 0},
-        'PyOrig': {'time': 0.0, 'count': 0, 'acc_sum': 0.0, 'acc_count': 0, 'na_count': 0},
-        'Torch': {'time': 0.0, 'count': 0, 'acc_sum': 0.0, 'acc_count': 0, 'na_count': 0, 'low_acc_count': 0}
+        'C++': {
+            'time': 0.0,
+            'count': 0,
+            'acc_sum': 0.0,
+            'acc_count': 0,
+            'na_count': 0
+        },
+        'Py': {
+            'time': 0.0,
+            'count': 0,
+            'acc_sum': 0.0,
+            'acc_count': 0,
+            'na_count': 0
+        },
+        'PyOrig': {
+            'time': 0.0,
+            'count': 0,
+            'acc_sum': 0.0,
+            'acc_count': 0,
+            'na_count': 0
+        },
+        'Torch': {
+            'time': 0.0,
+            'count': 0,
+            'acc_sum': 0.0,
+            'acc_count': 0,
+            'na_count': 0,
+            'low_acc_count': 0
+        }
     }
 
     # Print results line by line
@@ -177,9 +209,9 @@ def benchmark_all():
     for res in results:
         in_type = res['Input']
         out_type = res['Output']
-        
+
         print(f"[{in_type} -> {out_type}]")
-        
+
         # C++
         cpp_time_str = res['C++ (s)']
         if cpp_time_str != 'nan':
@@ -200,7 +232,7 @@ def benchmark_all():
         if py_time_str != 'nan':
             agg_stats['Py']['time'] += float(py_time_str)
             agg_stats['Py']['count'] += 1
-            
+
             p_match = res.get('Py Match Stats')
             if p_match:
                 acc = p_match['accuracy']
@@ -209,11 +241,11 @@ def benchmark_all():
                 py_acc_str = f"{acc:.2f}%"
                 if p_match['status'] != 'PASS':
                     py_acc_str += f" (Err: {p_match['error_count']})"
-            
+
             print(f" Py: {py_time_str}s ({py_spd}), acc: {py_acc_str}")
         else:
-             agg_stats['Py']['na_count'] += 1
-             print(f" Py: N/A")
+            agg_stats['Py']['na_count'] += 1
+            print(f" Py: N/A")
 
         # PyOrig
         py_orig_time_str = res['PyOrig (s)']
@@ -222,7 +254,7 @@ def benchmark_all():
         if py_orig_time_str != 'nan':
             agg_stats['PyOrig']['time'] += float(py_orig_time_str)
             agg_stats['PyOrig']['count'] += 1
-            
+
             po_match = res.get('PyOrig Match Stats')
             if po_match:
                 acc = po_match['accuracy']
@@ -232,10 +264,10 @@ def benchmark_all():
                 if po_match['status'] != 'PASS':
                     py_orig_acc_str += f" (Err: {po_match['error_count']})"
             elif res['PyOrig Match'] == 'PASS':
-                 py_orig_acc_str = "100.00%"
+                py_orig_acc_str = "100.00%"
             else:
-                 py_orig_acc_str = res['PyOrig Match']
-            
+                py_orig_acc_str = res['PyOrig Match']
+
             print(f" PyOrig: {py_orig_time_str}s ({py_orig_spd}), acc: {py_orig_acc_str}")
         else:
             agg_stats['PyOrig']['na_count'] += 1
@@ -244,14 +276,14 @@ def benchmark_all():
         # Torch
         torch_time_str = res['Torch (s)']
         torch_acc_str = "N/A"
-        
+
         if res['Torch Error']:
-             agg_stats['Torch']['na_count'] += 1
-             print(f" Torch: N/A (Error: {res['Torch Error']})")
+            agg_stats['Torch']['na_count'] += 1
+            print(f" Torch: N/A (Error: {res['Torch Error']})")
         elif torch_time_str != 'nan':
             agg_stats['Torch']['time'] += float(torch_time_str)
             agg_stats['Torch']['count'] += 1
-            
+
             t_match = res.get('Torch Match Stats')
             if t_match:
                 acc = t_match['accuracy']
@@ -264,45 +296,46 @@ def benchmark_all():
                 if t_match['status'] != 'PASS':
                     torch_acc_str += f" (Err: {t_match['error_count']})"
             elif res['Torch Match'] != 'N/A':
-                 torch_acc_str = res['Torch Match']
-            
+                torch_acc_str = res['Torch Match']
+
             print(f" Torch: {torch_time_str}s, acc: {torch_acc_str}")
         else:
             agg_stats['Torch']['na_count'] += 1
             print(f" Torch: N/A")
-            
-        print("") # Empty line between cases
+
+        print("")  # Empty line between cases
 
     # Print Summary
     print("-" * 55)
     print("Summary:")
     print(f"{'Backend':<10} | {'Avg Time (s)':<12} | {'Avg Accuracy':<12} | {'N/A Count':<10}")
     print("-" * 55)
-    
+
     for backend in ['C++', 'Py', 'PyOrig', 'Torch']:
         stats = agg_stats[backend]
         avg_time = stats['time'] / stats['count'] if stats['count'] > 0 else 0.0
         avg_acc = stats['acc_sum'] / stats['acc_count'] if stats['acc_count'] > 0 else 0.0
         na_count = stats['na_count']
-        
+
         # PyOrig stats might be incomplete if we didn't update benchmark_pair
         if backend == 'PyOrig' and stats['acc_count'] == 0:
             acc_str = "N/A"
         else:
             acc_str = f"{avg_acc:.2f}%"
-            
+
         print(f"{backend:<10} | {avg_time:<12.6f} | {acc_str:<12} | {na_count:<10}")
 
     torch_low_acc = agg_stats['Torch']['low_acc_count']
     if torch_low_acc > 0:
         print(f"Torch accuracy < {TORCH_MIN_ACCURACY:.0f}%: {torch_low_acc} cases")
 
+
 def benchmark_pair(in_dtype, out_dtype, size=100000):
     # print(f"\nBenchmarking {in_dtype} -> {out_dtype} (size={size})")
-    
+
     in_name = getattr(in_dtype, '__name__', str(in_dtype))
     out_name = getattr(out_dtype, '__name__', str(out_dtype))
-    
+
     res_entry = {
         'Input': in_name,
         'Output': out_name,
@@ -315,14 +348,14 @@ def benchmark_pair(in_dtype, out_dtype, size=100000):
         'Py Match': 'N/A',
         'PyOrig Match': 'N/A',
         'Torch Match': 'N/A',
-        'Torch Error': None, # Added field
+        'Torch Error': None,  # Added field
         'Note': ''
     }
-    
+
     try:
         in_width = in_dtype.primitive_bitwidth
         out_width = out_dtype.primitive_bitwidth
-        
+
         if in_width == 8:
             input_uint = np.random.randint(0, 256, size, dtype=np.uint8)
             input_data = input_uint.view(np.uint8)
@@ -339,20 +372,20 @@ def benchmark_pair(in_dtype, out_dtype, size=100000):
             return res_entry
 
         input_uint64 = input_uint.astype(np.uint64)
-        
+
         in_w = in_dtype.primitive_bitwidth
         in_m = in_dtype.fp_mantissa_width
         in_b = in_dtype.exponent_bias
-        
+
         out_w = out_dtype.primitive_bitwidth
         out_m = out_dtype.fp_mantissa_width
         out_b = out_dtype.exponent_bias
-        
+
         # Define output width for torch verification
         out_width = out_w
 
         rounding_mode = _ir.ROUNDING_MODE.RTNE
-        
+
         # Benchmark Python
         start_time = time.perf_counter()
         try:
@@ -363,7 +396,7 @@ def benchmark_pair(in_dtype, out_dtype, size=100000):
             res_py = None
             py_time = 0
             res_entry['Py (s)'] = "nan"
-        
+
         # Benchmark Python Original
         start_time = time.perf_counter()
         try:
@@ -394,7 +427,7 @@ def benchmark_pair(in_dtype, out_dtype, size=100000):
                 res_cpp_spec = _interpreter.convert_float32_to_float16(input_data)
                 cpp_spec_time = time.perf_counter() - start_time
                 res_entry['C++ Spec (s)'] = f"{cpp_spec_time:.6f}"
-                
+
                 # Verify Spec
                 if res_cpp is not None:
                     res_cpp_flat = res_cpp.flatten()
@@ -402,30 +435,31 @@ def benchmark_pair(in_dtype, out_dtype, size=100000):
                     mismatch = np.sum(res_cpp_flat != res_cpp_spec_flat)
             except Exception:
                 pass
-        
+
         # Benchmark Torch
         torch_in_dtype = get_torch_dtype(in_dtype)
         torch_out_dtype = get_torch_dtype(out_dtype)
         res_torch = None
         torch_time = 0
-        
+
         if torch_in_dtype and torch_out_dtype:
             try:
                 # IMPORTANT: We must treat input bits as correct for the SOURCE type
-                # input_data is a numpy array. 
+                # input_data is a numpy array.
                 # If in_width is 8, it is uint8 view.
                 # If in_width is 32, it is float32 view (which is standard IEEE754).
-                
+
                 # Torch doesn't support .view() from integer types to float types directly for all types
                 # or vice versa in the same way numpy does sometimes.
                 # We need to be careful about how we construct the tensor.
-                
+
                 # Step 1: Create tensor with integer bits
                 if in_width == 8:
                     t_bits = torch.from_numpy(input_data.view(np.uint8))
                     t_in = t_bits.view(torch_in_dtype)
                 elif in_width == 16:
-                    t_bits = torch.from_numpy(input_data.view(np.int16)) # Torch uses int16 for half/bfloat storage view
+                    t_bits = torch.from_numpy(input_data.view(
+                        np.int16))  # Torch uses int16 for half/bfloat storage view
                     t_in = t_bits.view(torch_in_dtype)
                 elif in_width == 32:
                     t_bits = torch.from_numpy(input_data.view(np.int32))
@@ -440,12 +474,12 @@ def benchmark_pair(in_dtype, out_dtype, size=100000):
                 if t_in is not None:
                     # Debug print
                     # print(f"DEBUG: t_in type: {type(t_in)}, torch_out_dtype: {torch_out_dtype}, type: {type(torch_out_dtype)}")
-                    
+
                     start_time = time.perf_counter()
                     t_out = t_in.to(torch_out_dtype)
                     torch_time = time.perf_counter() - start_time
                     res_entry['Torch (s)'] = f"{torch_time:.6f}"
-                    
+
                     if out_width == 8:
                         res_torch = t_out.view(torch.uint8).numpy()
                     elif out_width == 16:
@@ -458,56 +492,59 @@ def benchmark_pair(in_dtype, out_dtype, size=100000):
                 # print(f"DEBUG EXCEPTION: {e}")
                 # print(f"DEBUG: in_width={in_width}, torch_in_dtype={torch_in_dtype}, type={type(torch_in_dtype)}")
                 res_entry['Torch (s)'] = "nan"
-                res_entry['Torch Error'] = f"{e} (in_width={in_width}, torch_in={torch_in_dtype}, torch_out={torch_out_dtype})"
+                res_entry[
+                    'Torch Error'] = f"{e} (in_width={in_width}, torch_in={torch_in_dtype}, torch_out={torch_out_dtype})"
         else:
-             res_entry['Torch (s)'] = "nan" # No dtype support
-             if not torch_in_dtype:
-                 res_entry['Torch Error'] = f"Unsupported input dtype: {in_dtype}"
-             elif not torch_out_dtype:
-                 res_entry['Torch Error'] = f"Unsupported output dtype: {out_dtype}"
+            res_entry['Torch (s)'] = "nan"  # No dtype support
+            if not torch_in_dtype:
+                res_entry['Torch Error'] = f"Unsupported input dtype: {in_dtype}"
+            elif not torch_out_dtype:
+                res_entry['Torch Error'] = f"Unsupported output dtype: {out_dtype}"
 
         # Speedups
         if cpp_time > 0 and py_time > 0:
             res_entry['Speedup (C++/Py)'] = f"{py_time / cpp_time:.2f}x"
         if cpp_time > 0 and py_orig_time > 0:
             res_entry['Speedup (C++/PyOrig)'] = f"{py_orig_time / cpp_time:.2f}x"
-            
+
         # Verification
         if res_cpp is not None:
             res_cpp_flat = res_cpp.flatten()
-            
+
             if res_py is not None:
                 res_py_flat = res_py.flatten().astype(np.uint64)
-                
+
                 # Use analyze_mismatch
                 p_stats = analyze_mismatch(res_py_flat, res_cpp_flat, out_dtype)
                 res_entry['Py Match Stats'] = p_stats
                 res_entry['Py Match'] = p_stats['status']
-                
+
             if res_py_orig is not None:
                 res_py_orig_flat = res_py_orig.flatten().astype(np.uint64)
-                
+
                 # Use analyze_mismatch for PyOrig as well
                 po_stats = analyze_mismatch(res_py_orig_flat, res_cpp_flat, out_dtype)
                 res_entry['PyOrig Match Stats'] = po_stats
                 res_entry['PyOrig Match'] = po_stats['status']
-                
+
             if res_torch is not None:
                 res_torch_flat = res_torch.flatten().astype(np.uint64)
-                
+
                 # Use analyze_mismatch
                 t_stats = analyze_mismatch(res_torch_flat, res_cpp_flat, out_dtype)
                 res_entry['Torch Match Stats'] = t_stats
                 res_entry['Torch Match'] = t_stats['status']
-        
+
         return res_entry
-            
+
     except Exception:
         return res_entry
+
 
 def benchmark_conversion():
     # This function was for initial specialized testing, merging it into main flow or skipping output
     pass
+
 
 if __name__ == "__main__":
     # benchmark_conversion()

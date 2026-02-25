@@ -1,24 +1,24 @@
+#include <algorithm>
 #include <atomic>
 #include <iostream>
 #include <map>
 #include <memory>
 #include <mutex>
+#include <omp.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <stdexcept>
 #include <type_traits>
-#include <omp.h>
-#include <algorithm>
 
 #ifdef _MSC_VER
 #include <intrin.h>
 static int __builtin_clzll(unsigned long long x) {
-    unsigned long index;
-    if (_BitScanReverse64(&index, x)) {
-        return 63 - index;
-    }
-    return 64;
+  unsigned long index;
+  if (_BitScanReverse64(&index, x)) {
+    return 63 - index;
+  }
+  return 64;
 }
 #endif
 
@@ -86,7 +86,8 @@ struct npy_half {
 
 constexpr uint32_t ToFloatBits(uint16_t h) {
   uint16_t h_exp = (h & Float16Bits::EXP_MASK);
-  uint32_t f_sgn = ((uint32_t)h & Float16Bits::SIGN_MASK) << Float32BitsToFloat16Bits::SIGN_SHIFT;
+  uint32_t f_sgn = ((uint32_t)h & Float16Bits::SIGN_MASK)
+                   << Float32BitsToFloat16Bits::SIGN_SHIFT;
   switch (h_exp) {
   case Float16Bits::EXP_ALL_ZERO: { // 0 or subnormal
     uint16_t h_sig = (h & Float16Bits::SIG_MASK);
@@ -98,8 +99,11 @@ constexpr uint32_t ToFloatBits(uint16_t h) {
       h_sig <<= 1;
       h_exp++;
     }
-    uint32_t f_exp = ((uint32_t)(Float32Bits::EXP_BIAS - Float16Bits::EXP_BIAS - h_exp)) << Float32Bits::EXP_POS;
-    uint32_t f_sig = ((uint32_t)(h_sig & Float16Bits::SIG_MASK)) << Float32BitsToFloat16Bits::SIG_SHIFT;
+    uint32_t f_exp =
+        ((uint32_t)(Float32Bits::EXP_BIAS - Float16Bits::EXP_BIAS - h_exp))
+        << Float32Bits::EXP_POS;
+    uint32_t f_sig = ((uint32_t)(h_sig & Float16Bits::SIG_MASK))
+                     << Float32BitsToFloat16Bits::SIG_SHIFT;
     return f_sgn + f_exp + f_sig;
   }
   case Float16Bits::EXP_MASK: // inf or NaN
@@ -117,12 +121,14 @@ constexpr uint32_t ToFloatBits(uint16_t h) {
   }
 }
 
-template <bool raise_overflow = true, bool raise_underflow = true, bool round_even = true>
+template <bool raise_overflow = true, bool raise_underflow = true,
+          bool round_even = true>
 inline uint16_t FromFloatBits(uint32_t f) {
   uint32_t f_exp, f_sig;
   uint16_t h_sgn, h_exp, h_sig;
 
-  h_sgn = (uint16_t)((f & Float32Bits::SIGN_MASK) >> Float32BitsToFloat16Bits::SIGN_SHIFT);
+  h_sgn = (uint16_t)((f & Float32Bits::SIGN_MASK) >>
+                     Float32BitsToFloat16Bits::SIGN_SHIFT);
   f_exp = (f & Float32Bits::EXP_MASK);
 
   // Exponent overflow/NaN converts to signed inf/NaN
@@ -131,7 +137,9 @@ inline uint16_t FromFloatBits(uint32_t f) {
       f_sig = (f & Float32Bits::SIG_MASK);
       if (f_sig != 0) {
         // NaN - propagate the flag in the significand
-        uint16_t ret = (uint16_t)(Float16Bits::EXP_MASK + (f_sig >> Float32BitsToFloat16Bits::SIG_SHIFT));
+        uint16_t ret =
+            (uint16_t)(Float16Bits::EXP_MASK +
+                       (f_sig >> Float32BitsToFloat16Bits::SIG_SHIFT));
         if (ret == Float16Bits::EXP_MASK) {
           ret++;
         } // Defend against NaN payload miss
@@ -163,14 +171,16 @@ inline uint16_t FromFloatBits(uint32_t f) {
     f_exp >>= Float32Bits::EXP_POS;
     f_sig = Float32Bits::IMPLICIT_BIT | (f & Float32Bits::SIG_MASK);
     if constexpr (raise_underflow) {
-      if ((f_sig & (((uint32_t)1 << (Float32Bits::EXP_BIAS - 1 - f_exp)) - 1)) != 0) {
+      if ((f_sig &
+           (((uint32_t)1 << (Float32Bits::EXP_BIAS - 1 - f_exp)) - 1)) != 0) {
         throw std::underflow_error("underflow to subnormal");
       }
     }
     f_sig >>= (Float32BitsToFloat16Bits::SIG_SUBNORMAL_SHIFT_BASE - f_exp);
 
     if constexpr (round_even) {
-      if (((f_sig & Float32BitsToFloat16Bits::ROUND_CHECK_MASK) != Float32BitsToFloat16Bits::ROUND_ADD_VALUE) ||
+      if (((f_sig & Float32BitsToFloat16Bits::ROUND_CHECK_MASK) !=
+           Float32BitsToFloat16Bits::ROUND_ADD_VALUE) ||
           (f & Float32BitsToFloat16Bits::ROUND_REMAIN_MASK)) {
         f_sig += Float32BitsToFloat16Bits::ROUND_ADD_VALUE;
       }
@@ -183,11 +193,14 @@ inline uint16_t FromFloatBits(uint32_t f) {
   }
 
   // Regular case with no overflow or underflow
-  h_exp = (uint16_t)((f_exp - Float32BitsToFloat16Bits::EXP_UNDERFLOW_THRESHOLD) >> Float32BitsToFloat16Bits::SIG_SHIFT);
+  h_exp =
+      (uint16_t)((f_exp - Float32BitsToFloat16Bits::EXP_UNDERFLOW_THRESHOLD) >>
+                 Float32BitsToFloat16Bits::SIG_SHIFT);
   f_sig = (f & Float32Bits::SIG_MASK);
 
   if constexpr (round_even) {
-    if ((f_sig & Float32BitsToFloat16Bits::ROUND_CHECK_MASK) != Float32BitsToFloat16Bits::ROUND_ADD_VALUE) {
+    if ((f_sig & Float32BitsToFloat16Bits::ROUND_CHECK_MASK) !=
+        Float32BitsToFloat16Bits::ROUND_ADD_VALUE) {
       f_sig += Float32BitsToFloat16Bits::ROUND_ADD_VALUE;
     }
   } else {
@@ -206,8 +219,11 @@ inline uint16_t FromFloatBits(uint32_t f) {
 
 template <typename To, typename From>
 inline To BitCast(const From &from) noexcept {
-  static_assert(sizeof(To) == sizeof(From), "both data types must have the same size");
-  static_assert(std::is_trivially_copyable_v<To> && std::is_trivially_copyable_v<From>, "both data types must be trivially copyable");
+  static_assert(sizeof(To) == sizeof(From),
+                "both data types must have the same size");
+  static_assert(std::is_trivially_copyable_v<To> &&
+                    std::is_trivially_copyable_v<From>,
+                "both data types must be trivially copyable");
   To to;
   memcpy(&to, &from, sizeof(from));
   return to;
@@ -256,21 +272,23 @@ inline uint64_t convert_element(uint64_t in_val) {
     in_is_nan = (in_val == 0x80);
   } else {
     if (in_exp == in_exp_mask) {
-        in_is_inf = (in_mant == 0);
-        in_is_nan = (in_mant != 0);
+      in_is_inf = (in_mant == 0);
+      in_is_nan = (in_mant != 0);
     }
   }
 
   if (in_is_nan || in_is_inf) {
     if constexpr (out_is_e4m3fn) {
-      if (in_is_nan) return 0x7f;
+      if (in_is_nan)
+        return 0x7f;
       return (sign << out_sign_pos) | 0x7f;
     }
     if constexpr (out_is_fnuz) {
       return 0x80;
     }
     if constexpr (out_is_e5m2) {
-      if (in_is_nan) return 0x7f;
+      if (in_is_nan)
+        return 0x7f;
       return (sign << out_sign_pos) | 0x7c;
     }
     constexpr uint64_t out_exp_bits = OutW - OutM - 1;
@@ -310,67 +328,69 @@ inline uint64_t convert_element(uint64_t in_val) {
 
   // Check bounds
   if (out_exp_val > 0 && out_exp_val < out_exp_max) {
-      // Normal output (Common case)
-      final_exp = (uint64_t)out_exp_val;
-      if constexpr (shift_diff > 0) {
-          // Downsample with rounding
-          constexpr uint64_t round_bit = 1ULL << (shift_diff - 1);
-          constexpr uint64_t sticky_mask = round_bit - 1;
-          bool lsb = (normalized_mant >> shift_diff) & 1;
-          bool round = (normalized_mant & round_bit) != 0;
-          bool sticky = (normalized_mant & sticky_mask) != 0;
-          
-          final_mant = normalized_mant >> shift_diff;
-          if (round && (lsb || sticky)) {
-              final_mant++;
-              if (final_mant > out_mant_mask) {
-                  final_mant = 0;
-                  final_exp++;
-              }
-          }
-      } else {
-          final_mant = normalized_mant << (-shift_diff);
+    // Normal output (Common case)
+    final_exp = (uint64_t)out_exp_val;
+    if constexpr (shift_diff > 0) {
+      // Downsample with rounding
+      constexpr uint64_t round_bit = 1ULL << (shift_diff - 1);
+      constexpr uint64_t sticky_mask = round_bit - 1;
+      bool lsb = (normalized_mant >> shift_diff) & 1;
+      bool round = (normalized_mant & round_bit) != 0;
+      bool sticky = (normalized_mant & sticky_mask) != 0;
+
+      final_mant = normalized_mant >> shift_diff;
+      if (round && (lsb || sticky)) {
+        final_mant++;
+        if (final_mant > out_mant_mask) {
+          final_mant = 0;
+          final_exp++;
+        }
       }
+    } else {
+      final_mant = normalized_mant << (-shift_diff);
+    }
   } else if (out_exp_val >= (int64_t)out_exp_max) {
-      if constexpr (out_is_e4m3fn) {
-          final_exp = out_exp_max;
-          final_mant = out_mant_mask;
-      } else if constexpr (out_is_fnuz) {
-          return 0x80;
-      } else {
-          final_exp = out_exp_max;
-          final_mant = 0;
-      }
+    if constexpr (out_is_e4m3fn) {
+      final_exp = out_exp_max;
+      final_mant = out_mant_mask;
+    } else if constexpr (out_is_fnuz) {
+      return 0x80;
+    } else {
+      final_exp = out_exp_max;
+      final_mant = 0;
+    }
   } else {
-      // Underflow
-      int sub_shift = 1 - out_exp_val;
-      int total_shift = shift_diff + sub_shift;
-      
-      final_exp = 0;
-      // Add implicit bit
-      uint64_t full_mant = normalized_mant | (1ULL << InM);
-      
-      if (total_shift >= 64) {
-          final_mant = 0;
-      } else if (total_shift > 0) {
-          uint64_t round_bit = 1ULL << (total_shift - 1);
-          uint64_t sticky_mask = round_bit - 1;
-          bool lsb = (full_mant >> total_shift) & 1;
-          bool round = (full_mant & round_bit) != 0;
-          bool sticky = (full_mant & sticky_mask) != 0;
-          
-          final_mant = full_mant >> total_shift;
-          if (round && (lsb || sticky)) {
-              final_mant++;
-          }
-      } else {
-          final_mant = full_mant << (-total_shift);
+    // Underflow
+    int sub_shift = 1 - out_exp_val;
+    int total_shift = shift_diff + sub_shift;
+
+    final_exp = 0;
+    // Add implicit bit
+    uint64_t full_mant = normalized_mant | (1ULL << InM);
+
+    if (total_shift >= 64) {
+      final_mant = 0;
+    } else if (total_shift > 0) {
+      uint64_t round_bit = 1ULL << (total_shift - 1);
+      uint64_t sticky_mask = round_bit - 1;
+      bool lsb = (full_mant >> total_shift) & 1;
+      bool round = (full_mant & round_bit) != 0;
+      bool sticky = (full_mant & sticky_mask) != 0;
+
+      final_mant = full_mant >> total_shift;
+      if (round && (lsb || sticky)) {
+        final_mant++;
       }
+    } else {
+      final_mant = full_mant << (-total_shift);
+    }
   }
 
-  uint64_t result = (sign << out_sign_pos) | (final_exp << OutM) | (final_mant & out_mant_mask);
+  uint64_t result = (sign << out_sign_pos) | (final_exp << OutM) |
+                    (final_mant & out_mant_mask);
   if constexpr (out_is_fnuz) {
-      if (final_exp == 0 && (final_mant & out_mant_mask) == 0) return 0;
+    if (final_exp == 0 && (final_mant & out_mant_mask) == 0)
+      return 0;
   }
   return result;
 }
@@ -382,7 +402,8 @@ struct FPDesc {
   int bias;
 };
 
-inline uint64_t convert_element_runtime(uint64_t in_val, const FPDesc& in, const FPDesc& out) {
+inline uint64_t convert_element_runtime(uint64_t in_val, const FPDesc &in,
+                                        const FPDesc &out) {
   const uint64_t in_mant_mask = (1ULL << in.mantissa) - 1;
   const uint64_t out_mant_mask = (1ULL << out.mantissa) - 1;
   const uint64_t in_sign_pos = in.width - 1;
@@ -394,18 +415,24 @@ inline uint64_t convert_element_runtime(uint64_t in_val, const FPDesc& in, const
   uint64_t sign = (in_val >> in_sign_pos) & 1;
   uint64_t in_exp = (in_val >> in.mantissa) & in_exp_mask;
   uint64_t in_mant = in_val & in_mant_mask;
-  
+
   const bool in_is_e4m3fn = (in.width == 8 && in.mantissa == 3 && in.bias == 7);
-  const bool in_is_e4m3fnuz = (in.width == 8 && in.mantissa == 3 && in.bias == 8);
+  const bool in_is_e4m3fnuz =
+      (in.width == 8 && in.mantissa == 3 && in.bias == 8);
   const bool in_is_e5m2 = (in.width == 8 && in.mantissa == 2 && in.bias == 15);
-  const bool in_is_e5m2fnuz = (in.width == 8 && in.mantissa == 2 && in.bias == 16);
+  const bool in_is_e5m2fnuz =
+      (in.width == 8 && in.mantissa == 2 && in.bias == 16);
   const bool in_is_fnuz = in_is_e4m3fnuz || in_is_e5m2fnuz;
   const bool in_no_inf = in_is_e4m3fn || in_is_fnuz;
 
-  const bool out_is_e4m3fn = (out.width == 8 && out.mantissa == 3 && out.bias == 7);
-  const bool out_is_e4m3fnuz = (out.width == 8 && out.mantissa == 3 && out.bias == 8);
-  const bool out_is_e5m2 = (out.width == 8 && out.mantissa == 2 && out.bias == 15);
-  const bool out_is_e5m2fnuz = (out.width == 8 && out.mantissa == 2 && out.bias == 16);
+  const bool out_is_e4m3fn =
+      (out.width == 8 && out.mantissa == 3 && out.bias == 7);
+  const bool out_is_e4m3fnuz =
+      (out.width == 8 && out.mantissa == 3 && out.bias == 8);
+  const bool out_is_e5m2 =
+      (out.width == 8 && out.mantissa == 2 && out.bias == 15);
+  const bool out_is_e5m2fnuz =
+      (out.width == 8 && out.mantissa == 2 && out.bias == 16);
   const bool out_is_fnuz = out_is_e4m3fnuz || out_is_e5m2fnuz;
 
   bool in_is_nan = false;
@@ -421,14 +448,16 @@ inline uint64_t convert_element_runtime(uint64_t in_val, const FPDesc& in, const
 
   if (in_is_nan || in_is_inf) {
     if (out_is_e4m3fn) {
-      if (in_is_nan) return 0x7f;
+      if (in_is_nan)
+        return 0x7f;
       return (sign << out_sign_pos) | 0x7f;
     }
     if (out_is_fnuz) {
       return 0x80;
     }
     if (out_is_e5m2) {
-      if (in_is_nan) return 0x7f;
+      if (in_is_nan)
+        return 0x7f;
       return (sign << out_sign_pos) | 0x7c;
     }
     uint64_t out_exp_bits = out.width - out.mantissa - 1;
@@ -462,89 +491,100 @@ inline uint64_t convert_element_runtime(uint64_t in_val, const FPDesc& in, const
   uint64_t final_exp, final_mant;
 
   if (out_exp_val > 0 && out_exp_val < out_exp_max) {
-      final_exp = (uint64_t)out_exp_val;
-      if (shift_diff > 0) {
-          uint64_t round_bit = 1ULL << (shift_diff - 1);
-          uint64_t sticky_mask = round_bit - 1;
-          bool lsb = (normalized_mant >> shift_diff) & 1;
-          bool round = (normalized_mant & round_bit) != 0;
-          bool sticky = (normalized_mant & sticky_mask) != 0;
-          
-          final_mant = normalized_mant >> shift_diff;
-          if (round && (lsb || sticky)) {
-              final_mant++;
-              if (final_mant > out_mant_mask) {
-                  final_mant = 0;
-                  final_exp++;
-              }
-          }
-      } else {
-          final_mant = normalized_mant << (-shift_diff);
+    final_exp = (uint64_t)out_exp_val;
+    if (shift_diff > 0) {
+      uint64_t round_bit = 1ULL << (shift_diff - 1);
+      uint64_t sticky_mask = round_bit - 1;
+      bool lsb = (normalized_mant >> shift_diff) & 1;
+      bool round = (normalized_mant & round_bit) != 0;
+      bool sticky = (normalized_mant & sticky_mask) != 0;
+
+      final_mant = normalized_mant >> shift_diff;
+      if (round && (lsb || sticky)) {
+        final_mant++;
+        if (final_mant > out_mant_mask) {
+          final_mant = 0;
+          final_exp++;
+        }
       }
+    } else {
+      final_mant = normalized_mant << (-shift_diff);
+    }
   } else if (out_exp_val >= (int64_t)out_exp_max) {
-      if (out_is_e4m3fn) {
-          final_exp = out_exp_max;
-          final_mant = out_mant_mask;
-      } else if (out_is_fnuz) {
-          return 0x80;
-      } else {
-          final_exp = out_exp_max;
-          final_mant = 0;
-      }
+    if (out_is_e4m3fn) {
+      final_exp = out_exp_max;
+      final_mant = out_mant_mask;
+    } else if (out_is_fnuz) {
+      return 0x80;
+    } else {
+      final_exp = out_exp_max;
+      final_mant = 0;
+    }
   } else {
-      int sub_shift = 1 - out_exp_val;
-      int total_shift = shift_diff + sub_shift;
-      
-      final_exp = 0;
-      uint64_t full_mant = normalized_mant | (1ULL << in.mantissa);
-      
-      if (total_shift >= 64) {
-          final_mant = 0;
-      } else if (total_shift > 0) {
-          uint64_t round_bit = 1ULL << (total_shift - 1);
-          uint64_t sticky_mask = round_bit - 1;
-          bool lsb = (full_mant >> total_shift) & 1;
-          bool round = (full_mant & round_bit) != 0;
-          bool sticky = (full_mant & sticky_mask) != 0;
-          
-          final_mant = full_mant >> total_shift;
-          if (round && (lsb || sticky)) {
-              final_mant++;
-          }
-      } else {
-          final_mant = full_mant << (-total_shift);
+    int sub_shift = 1 - out_exp_val;
+    int total_shift = shift_diff + sub_shift;
+
+    final_exp = 0;
+    uint64_t full_mant = normalized_mant | (1ULL << in.mantissa);
+
+    if (total_shift >= 64) {
+      final_mant = 0;
+    } else if (total_shift > 0) {
+      uint64_t round_bit = 1ULL << (total_shift - 1);
+      uint64_t sticky_mask = round_bit - 1;
+      bool lsb = (full_mant >> total_shift) & 1;
+      bool round = (full_mant & round_bit) != 0;
+      bool sticky = (full_mant & sticky_mask) != 0;
+
+      final_mant = full_mant >> total_shift;
+      if (round && (lsb || sticky)) {
+        final_mant++;
       }
+    } else {
+      final_mant = full_mant << (-total_shift);
+    }
   }
 
-  uint64_t result = (sign << out_sign_pos) | (final_exp << out.mantissa) | (final_mant & out_mant_mask);
-  if (out_is_fnuz && final_exp == 0 && (final_mant & out_mant_mask) == 0) return 0;
+  uint64_t result = (sign << out_sign_pos) | (final_exp << out.mantissa) |
+                    (final_mant & out_mant_mask);
+  if (out_is_fnuz && final_exp == 0 && (final_mant & out_mant_mask) == 0)
+    return 0;
   return result;
 }
 
 enum class FPType {
-    FP32,
-    FP16,
-    BF16,
-    FP64,
-    FP8E5,
-    FP8E4NV,
-    FP8E4B8,
-    FP8E4B15,
-    FP8E5B16,
-    UNKNOWN
+  FP32,
+  FP16,
+  BF16,
+  FP64,
+  FP8E5,
+  FP8E4NV,
+  FP8E4B8,
+  FP8E4B15,
+  FP8E5B16,
+  UNKNOWN
 };
 
 constexpr FPType get_fp_type(int w, int m, int b) {
-    if (w == 32 && m == 23 && b == 127) return FPType::FP32;
-    if (w == 16 && m == 10 && b == 15) return FPType::FP16;
-    if (w == 16 && m == 7 && b == 127) return FPType::BF16;
-    if (w == 64 && m == 52 && b == 1023) return FPType::FP64;
-    if (w == 8 && m == 2 && b == 15) return FPType::FP8E5;
-    if (w == 8 && m == 3 && b == 7) return FPType::FP8E4NV;
-    if (w == 8 && m == 3 && b == 8) return FPType::FP8E4B8;
-    if (w == 8 && m == 3 && b == 15) return FPType::FP8E4B15;
-    if (w == 8 && m == 2 && b == 16) return FPType::FP8E5B16;
-    return FPType::UNKNOWN;
+  if (w == 32 && m == 23 && b == 127)
+    return FPType::FP32;
+  if (w == 16 && m == 10 && b == 15)
+    return FPType::FP16;
+  if (w == 16 && m == 7 && b == 127)
+    return FPType::BF16;
+  if (w == 64 && m == 52 && b == 1023)
+    return FPType::FP64;
+  if (w == 8 && m == 2 && b == 15)
+    return FPType::FP8E5;
+  if (w == 8 && m == 3 && b == 7)
+    return FPType::FP8E4NV;
+  if (w == 8 && m == 3 && b == 8)
+    return FPType::FP8E4B8;
+  if (w == 8 && m == 3 && b == 15)
+    return FPType::FP8E4B15;
+  if (w == 8 && m == 2 && b == 16)
+    return FPType::FP8E5B16;
+  return FPType::UNKNOWN;
 }
 
 #ifdef _MSC_VER
@@ -554,62 +594,74 @@ constexpr FPType get_fp_type(int w, int m, int b) {
 #endif
 
 // Helper macro to generate specialization call
-#define GENERATE_CASES(IN_TYPE, IN_W, IN_M, IN_B) \
-    case IN_TYPE: \
-        switch (out_type) { \
-            case FPType::FP32: \
-                PARALLEL_FOR \
-                for (py::ssize_t i = 0; i < buf_in.size; ++i) dst[i] = convert_element<IN_W, IN_M, IN_B, 32, 23, 127>(src[i]); \
-                return result; \
-            case FPType::FP16: \
-                PARALLEL_FOR \
-                for (py::ssize_t i = 0; i < buf_in.size; ++i) dst[i] = convert_element<IN_W, IN_M, IN_B, 16, 10, 15>(src[i]); \
-                return result; \
-            case FPType::BF16: \
-                PARALLEL_FOR \
-                for (py::ssize_t i = 0; i < buf_in.size; ++i) dst[i] = convert_element<IN_W, IN_M, IN_B, 16, 7, 127>(src[i]); \
-                return result; \
-            case FPType::FP64: \
-                PARALLEL_FOR \
-                for (py::ssize_t i = 0; i < buf_in.size; ++i) dst[i] = convert_element<IN_W, IN_M, IN_B, 64, 52, 1023>(src[i]); \
-                return result; \
-            case FPType::FP8E5: \
-                PARALLEL_FOR \
-                for (py::ssize_t i = 0; i < buf_in.size; ++i) dst[i] = convert_element<IN_W, IN_M, IN_B, 8, 2, 15>(src[i]); \
-                return result; \
-            case FPType::FP8E4NV: \
-                PARALLEL_FOR \
-                for (py::ssize_t i = 0; i < buf_in.size; ++i) dst[i] = convert_element<IN_W, IN_M, IN_B, 8, 3, 7>(src[i]); \
-                return result; \
-            case FPType::FP8E4B8: \
-                PARALLEL_FOR \
-                for (py::ssize_t i = 0; i < buf_in.size; ++i) dst[i] = convert_element<IN_W, IN_M, IN_B, 8, 3, 8>(src[i]); \
-                return result; \
-            case FPType::FP8E4B15: \
-                PARALLEL_FOR \
-                for (py::ssize_t i = 0; i < buf_in.size; ++i) dst[i] = convert_element<IN_W, IN_M, IN_B, 8, 3, 15>(src[i]); \
-                return result; \
-            case FPType::FP8E5B16: \
-                PARALLEL_FOR \
-                for (py::ssize_t i = 0; i < buf_in.size; ++i) dst[i] = convert_element<IN_W, IN_M, IN_B, 8, 2, 16>(src[i]); \
-                return result; \
-            default: break; \
-        } \
-        break;
+#define GENERATE_CASES(IN_TYPE, IN_W, IN_M, IN_B)                              \
+  case IN_TYPE:                                                                \
+    switch (out_type) {                                                        \
+    case FPType::FP32:                                                         \
+      PARALLEL_FOR                                                             \
+      for (py::ssize_t i = 0; i < buf_in.size; ++i)                            \
+        dst[i] = convert_element<IN_W, IN_M, IN_B, 32, 23, 127>(src[i]);       \
+      return result;                                                           \
+    case FPType::FP16:                                                         \
+      PARALLEL_FOR                                                             \
+      for (py::ssize_t i = 0; i < buf_in.size; ++i)                            \
+        dst[i] = convert_element<IN_W, IN_M, IN_B, 16, 10, 15>(src[i]);        \
+      return result;                                                           \
+    case FPType::BF16:                                                         \
+      PARALLEL_FOR                                                             \
+      for (py::ssize_t i = 0; i < buf_in.size; ++i)                            \
+        dst[i] = convert_element<IN_W, IN_M, IN_B, 16, 7, 127>(src[i]);        \
+      return result;                                                           \
+    case FPType::FP64:                                                         \
+      PARALLEL_FOR                                                             \
+      for (py::ssize_t i = 0; i < buf_in.size; ++i)                            \
+        dst[i] = convert_element<IN_W, IN_M, IN_B, 64, 52, 1023>(src[i]);      \
+      return result;                                                           \
+    case FPType::FP8E5:                                                        \
+      PARALLEL_FOR                                                             \
+      for (py::ssize_t i = 0; i < buf_in.size; ++i)                            \
+        dst[i] = convert_element<IN_W, IN_M, IN_B, 8, 2, 15>(src[i]);          \
+      return result;                                                           \
+    case FPType::FP8E4NV:                                                      \
+      PARALLEL_FOR                                                             \
+      for (py::ssize_t i = 0; i < buf_in.size; ++i)                            \
+        dst[i] = convert_element<IN_W, IN_M, IN_B, 8, 3, 7>(src[i]);           \
+      return result;                                                           \
+    case FPType::FP8E4B8:                                                      \
+      PARALLEL_FOR                                                             \
+      for (py::ssize_t i = 0; i < buf_in.size; ++i)                            \
+        dst[i] = convert_element<IN_W, IN_M, IN_B, 8, 3, 8>(src[i]);           \
+      return result;                                                           \
+    case FPType::FP8E4B15:                                                     \
+      PARALLEL_FOR                                                             \
+      for (py::ssize_t i = 0; i < buf_in.size; ++i)                            \
+        dst[i] = convert_element<IN_W, IN_M, IN_B, 8, 3, 15>(src[i]);          \
+      return result;                                                           \
+    case FPType::FP8E5B16:                                                     \
+      PARALLEL_FOR                                                             \
+      for (py::ssize_t i = 0; i < buf_in.size; ++i)                            \
+        dst[i] = convert_element<IN_W, IN_M, IN_B, 8, 2, 16>(src[i]);          \
+      return result;                                                           \
+    default:                                                                   \
+      break;                                                                   \
+    }                                                                          \
+    break;
 
-py::array_t<uint64_t> convert_float(py::array_t<uint64_t> input, int in_w, int in_m, int in_b,
-    int out_w, int out_m, int out_b) {
+py::array_t<uint64_t> convert_float(py::array_t<uint64_t> input, int in_w,
+                                    int in_m, int in_b, int out_w, int out_m,
+                                    int out_b) {
 
   auto buf_in = input.request();
   auto result = py::array_t<uint64_t>(buf_in.shape);
   auto buf_out = result.request();
-  
-  const uint64_t* src = static_cast<const uint64_t*>(buf_in.ptr);
-  uint64_t* dst = static_cast<uint64_t*>(buf_out.ptr);
-  
+
+  const uint64_t *src = static_cast<const uint64_t *>(buf_in.ptr);
+  uint64_t *dst = static_cast<uint64_t *>(buf_out.ptr);
+
   // FP32 -> FP16 (Specialized Intrinsic)
-  if (in_w == 32 && in_m == 23 && in_b == 127 && out_w == 16 && out_m == 10 && out_b == 15) {
-    #pragma omp parallel for
+  if (in_w == 32 && in_m == 23 && in_b == 127 && out_w == 16 && out_m == 10 &&
+      out_b == 15) {
+#pragma omp parallel for
     for (py::ssize_t i = 0; i < buf_in.size; ++i) {
       dst[i] = FromFloatBits<false, false>(static_cast<uint32_t>(src[i]));
     }
@@ -617,33 +669,35 @@ py::array_t<uint64_t> convert_float(py::array_t<uint64_t> input, int in_w, int i
   }
 
   // FP16 -> FP32 (Specialized Intrinsic)
-  if (in_w == 16 && in_m == 10 && in_b == 15 && out_w == 32 && out_m == 23 && out_b == 127) {
-    #pragma omp parallel for
+  if (in_w == 16 && in_m == 10 && in_b == 15 && out_w == 32 && out_m == 23 &&
+      out_b == 127) {
+#pragma omp parallel for
     for (py::ssize_t i = 0; i < buf_in.size; ++i) {
       dst[i] = ToFloatBits(static_cast<uint16_t>(src[i]));
     }
     return result;
   }
-  
+
   FPType in_type = get_fp_type(in_w, in_m, in_b);
   FPType out_type = get_fp_type(out_w, out_m, out_b);
 
   switch (in_type) {
-      GENERATE_CASES(FPType::FP32, 32, 23, 127)
-      GENERATE_CASES(FPType::FP16, 16, 10, 15)
-      GENERATE_CASES(FPType::BF16, 16, 7, 127)
-      GENERATE_CASES(FPType::FP64, 64, 52, 1023)
-      GENERATE_CASES(FPType::FP8E5, 8, 2, 15)
-      GENERATE_CASES(FPType::FP8E4NV, 8, 3, 7)
-      GENERATE_CASES(FPType::FP8E4B8, 8, 3, 8)
-      GENERATE_CASES(FPType::FP8E4B15, 8, 3, 15)
-      GENERATE_CASES(FPType::FP8E5B16, 8, 2, 16)
-      default: break;
+    GENERATE_CASES(FPType::FP32, 32, 23, 127)
+    GENERATE_CASES(FPType::FP16, 16, 10, 15)
+    GENERATE_CASES(FPType::BF16, 16, 7, 127)
+    GENERATE_CASES(FPType::FP64, 64, 52, 1023)
+    GENERATE_CASES(FPType::FP8E5, 8, 2, 15)
+    GENERATE_CASES(FPType::FP8E4NV, 8, 3, 7)
+    GENERATE_CASES(FPType::FP8E4B8, 8, 3, 8)
+    GENERATE_CASES(FPType::FP8E4B15, 8, 3, 15)
+    GENERATE_CASES(FPType::FP8E5B16, 8, 2, 16)
+  default:
+    break;
   }
-  
+
   FPDesc in_d = {in_w, in_m, in_b};
   FPDesc out_d = {out_w, out_m, out_b};
-  #pragma omp parallel for
+#pragma omp parallel for
   for (py::ssize_t i = 0; i < buf_in.size; ++i) {
     dst[i] = convert_element_runtime(src[i], in_d, out_d);
   }
@@ -983,14 +1037,16 @@ void atomic_compare_exchange_strong(void *loc, void *expected,
 
 class AtomicCASOp : public AtomicOp {
 public:
-  AtomicCASOp(const uint64_t *ptr, void *expected, const void *desired, const bool *mask,
-              size_t itemsize, size_t numel, std::memory_order order)
-      : AtomicOp(ptr, numel, order), expected(expected), desired(desired), mask(mask),
-        itemsize(itemsize) {}
+  AtomicCASOp(const uint64_t *ptr, void *expected, const void *desired,
+              const bool *mask, size_t itemsize, size_t numel,
+              std::memory_order order)
+      : AtomicOp(ptr, numel, order), expected(expected), desired(desired),
+        mask(mask), itemsize(itemsize) {}
 
 protected:
   void applyAt(void *loc, size_t i) override {
-    if (mask && !mask[i]) return;
+    if (mask && !mask[i])
+      return;
     // Atomic operations perform bitwise comparison, so it's safe to
     // use number of bytes (itemsize) to determine the type of pointers
     if (itemsize == 1) {
@@ -1102,7 +1158,8 @@ py::array atomic_rmw(RMWOp rmw_op, py::array_t<uint64_t> ptr, py::array val,
   return ret.reshape(shape);
 }
 
-py::array atomic_cas(py::array_t<uint64_t> ptr, py::array &cmp, py::array &val, py::array_t<bool> mask, MemSemantic sem) {
+py::array atomic_cas(py::array_t<uint64_t> ptr, py::array &cmp, py::array &val,
+                     py::array_t<bool> mask, MemSemantic sem) {
   std::memory_order order = MemSemantic_MAP[sem];
   int numel = ptr.size();
   auto shape = std::vector<ptrdiff_t>(ptr.shape(), ptr.shape() + ptr.ndim());
@@ -1113,9 +1170,12 @@ py::array atomic_cas(py::array_t<uint64_t> ptr, py::array &cmp, py::array &val, 
   py::array reshaped_val = val.reshape({numel});
   py::array_t<bool> reshaped_mask = mask.reshape({numel});
   auto itemsize = cmp.itemsize();
-  memcpy(static_cast<void *>(ret.mutable_data()), static_cast<const void *>(reshaped_cmp.data()), itemsize * numel);
-  AtomicCASOp(reshaped_ptr.data(), ret.mutable_data(), static_cast<const void *>(reshaped_val.data()), reshaped_mask.data(),
-      itemsize, numel, order).apply();
+  memcpy(static_cast<void *>(ret.mutable_data()),
+         static_cast<const void *>(reshaped_cmp.data()), itemsize * numel);
+  AtomicCASOp(reshaped_ptr.data(), ret.mutable_data(),
+              static_cast<const void *>(reshaped_val.data()),
+              reshaped_mask.data(), itemsize, numel, order)
+      .apply();
   return ret.reshape(shape);
 }
 
@@ -1145,28 +1205,29 @@ py::array load(py::array_t<uint64_t> ptr, py::array_t<bool> mask,
 
   // Optimized path for contiguous load
   if (numel > 0) {
-      bool contiguous = true;
-      uint64_t start_addr = ptr_data[0];
-      for (py::ssize_t i = 1; i < numel; ++i) {
-          if (ptr_data[i] != start_addr + i * itemsize) {
-              contiguous = false;
-              break;
-          }
+    bool contiguous = true;
+    uint64_t start_addr = ptr_data[0];
+    for (py::ssize_t i = 1; i < numel; ++i) {
+      if (ptr_data[i] != start_addr + i * itemsize) {
+        contiguous = false;
+        break;
       }
+    }
 
-      if (contiguous) {
-          bool all_masked = true;
-          for (py::ssize_t i = 0; i < numel; ++i) {
-              if (!mask_data[i]) {
-                  all_masked = false;
-                  break;
-              }
-          }
-          if (all_masked) {
-              memcpy(x_ptr, reinterpret_cast<const void*>(start_addr), numel * itemsize);
-              return x.reshape(shape);
-          }
+    if (contiguous) {
+      bool all_masked = true;
+      for (py::ssize_t i = 0; i < numel; ++i) {
+        if (!mask_data[i]) {
+          all_masked = false;
+          break;
+        }
       }
+      if (all_masked) {
+        memcpy(x_ptr, reinterpret_cast<const void *>(start_addr),
+               numel * itemsize);
+        return x.reshape(shape);
+      }
+    }
   }
 
   if (numel >= 4096) {
@@ -1206,28 +1267,29 @@ void store(py::array_t<uint64_t> ptr, py::array value, py::array_t<bool> mask) {
 
   // Optimized path for contiguous store
   if (numel > 0) {
-      bool contiguous = true;
-      uint64_t start_addr = ptr_data[0];
-      for (py::ssize_t i = 1; i < numel; ++i) {
-          if (ptr_data[i] != start_addr + i * itemsize) {
-              contiguous = false;
-              break;
-          }
+    bool contiguous = true;
+    uint64_t start_addr = ptr_data[0];
+    for (py::ssize_t i = 1; i < numel; ++i) {
+      if (ptr_data[i] != start_addr + i * itemsize) {
+        contiguous = false;
+        break;
       }
+    }
 
-      if (contiguous) {
-          bool all_masked = true;
-          for (py::ssize_t i = 0; i < numel; ++i) {
-              if (!mask_data[i]) {
-                  all_masked = false;
-                  break;
-              }
-          }
-          if (all_masked) {
-              memcpy(reinterpret_cast<void*>(start_addr), value_data, numel * itemsize);
-              return;
-          }
+    if (contiguous) {
+      bool all_masked = true;
+      for (py::ssize_t i = 0; i < numel; ++i) {
+        if (!mask_data[i]) {
+          all_masked = false;
+          break;
+        }
       }
+      if (all_masked) {
+        memcpy(reinterpret_cast<void *>(start_addr), value_data,
+               numel * itemsize);
+        return;
+      }
+    }
   }
 
   if (numel >= 4096) {
@@ -1249,7 +1311,8 @@ void store(py::array_t<uint64_t> ptr, py::array value, py::array_t<bool> mask) {
   }
 }
 
-void parallel_launch(py::function fn, std::vector<int> grid_dim, py::object builder) {
+void parallel_launch(py::function fn, std::vector<int> grid_dim,
+                     py::object builder) {
   int nx = grid_dim[0];
   int ny = grid_dim[1];
   int nz = grid_dim[2];
@@ -1258,15 +1321,15 @@ void parallel_launch(py::function fn, std::vector<int> grid_dim, py::object buil
   //   py::gil_scoped_release release;
 
   //   PARALLEL_FOR
-    for (py::ssize_t idx = 0; idx < (py::ssize_t)nx * ny * nz; ++idx) {
-      int z = idx % nz;
-      int y = (idx / nz) % ny;
-      int x = idx / (nz * ny);
+  for (py::ssize_t idx = 0; idx < (py::ssize_t)nx * ny * nz; ++idx) {
+    int z = idx % nz;
+    int y = (idx / nz) % ny;
+    int x = idx / (nz * ny);
 
-      // py::gil_scoped_acquire acquire;
-      builder.attr("set_grid_idx")(x, y, z);
-      fn();
-    }
+    // py::gil_scoped_acquire acquire;
+    builder.attr("set_grid_idx")(x, y, z);
+    fn();
+  }
   // }
 }
 
@@ -1331,7 +1394,8 @@ void init_interpreter(py::module_ &&m) {
         order (MemSemantic): Memory order for atomic operation.
     )pbdoc");
 
-  m.def("atomic_cas", &atomic_cas, "ptr"_a, "cmp"_a, "val"_a, "mask"_a, "order"_a,
+  m.def("atomic_cas", &atomic_cas, "ptr"_a, "cmp"_a, "val"_a, "mask"_a,
+        "order"_a,
         R"pbdoc(
     Perform compare-and-swap operation on memory addresses based on mask.
 

@@ -12,15 +12,15 @@ __all__: list[str] = ['MEM_SEMANTIC', 'RMW_OP', 'atomic_cas', 'atomic_rmw', 'con
 class MEM_SEMANTIC:
     """
     Memory semantic for atomic operations.
-    
+
     Members:
-    
+
       ACQUIRE_RELEASE : Acquire and release memory
-    
+
       ACQUIRE : Acquire memory
-    
+
       RELEASE : Release memory
-    
+
       RELAXED : Relaxed memory semantic
     """
     ACQUIRE: typing.ClassVar[MEM_SEMANTIC]  # value = <MEM_SEMANTIC.ACQUIRE: 1>
@@ -65,27 +65,27 @@ class MEM_SEMANTIC:
 class RMW_OP:
     """
     RMW operation enumeration class: specifies the type of atomic RMW operation
-    
+
     Members:
-    
+
       AND : AND operation
-    
+
       OR : OR operation
-    
+
       XOR : XOR operation
-    
+
       ADD : ADD operation
-    
+
       FADD : FADD operation
-    
+
       MAX : MAX operation
-    
+
       MIN : MIN operation
-    
+
       UMAX : UMAX operation
-    
+
       UMIN : UMIN operation
-    
+
       XCHG : XCHG operation
     """
     ADD: typing.ClassVar[RMW_OP]  # value = <RMW_OP.ADD: 0>
@@ -136,7 +136,7 @@ class RMW_OP:
 def atomic_cas(ptr: typing.Annotated[numpy.typing.ArrayLike, numpy.uint64], cmp: numpy.ndarray[typing.Any, numpy.dtype[typing.Any]], val: numpy.ndarray[typing.Any, numpy.dtype[typing.Any]], mask: typing.Annotated[numpy.typing.ArrayLike, numpy.bool], order: MEM_SEMANTIC) -> numpy.ndarray[typing.Any, numpy.dtype[typing.Any]]:
     """
         Perform compare-and-swap operation on memory addresses based on mask.
-    
+
         Args:
             ptr (numpy.ndarray): Memory addresses to perform compare-and-swap operation.
             cmp (numpy.ndarray): Values to compare.
@@ -147,7 +147,7 @@ def atomic_cas(ptr: typing.Annotated[numpy.typing.ArrayLike, numpy.uint64], cmp:
 def atomic_rmw(rmw_op: RMW_OP, ptr: typing.Annotated[numpy.typing.ArrayLike, numpy.uint64], val: numpy.ndarray[typing.Any, numpy.dtype[typing.Any]], mask: typing.Annotated[numpy.typing.ArrayLike, numpy.bool], order: MEM_SEMANTIC) -> numpy.ndarray[typing.Any, numpy.dtype[typing.Any]]:
     """
         Perform RMW operation on memory addresses based on mask.
-    
+
         Args:
             rmw_op (RMWOp): RMW operation to perform.
             ptr (numpy.ndarray): Memory addresses to perform RMW operation.
@@ -158,7 +158,7 @@ def atomic_rmw(rmw_op: RMW_OP, ptr: typing.Annotated[numpy.typing.ArrayLike, num
 def convert_float(input: typing.Annotated[numpy.typing.ArrayLike, numpy.uint64], in_w: typing.SupportsInt | typing.SupportsIndex, in_m: typing.SupportsInt | typing.SupportsIndex, in_b: typing.SupportsInt | typing.SupportsIndex, out_w: typing.SupportsInt | typing.SupportsIndex, out_m: typing.SupportsInt | typing.SupportsIndex, out_b: typing.SupportsInt | typing.SupportsIndex) -> numpy.typing.NDArray[numpy.uint64]:
     """
         Convert floating-point numbers between different representations.
-    
+
         Args:
             input (numpy.ndarray): Input array of floating-point numbers.
             in_w (int): Width of the input floating-point number representation.
@@ -171,7 +171,7 @@ def convert_float(input: typing.Annotated[numpy.typing.ArrayLike, numpy.uint64],
 def load(ptr: typing.Annotated[numpy.typing.ArrayLike, numpy.uint64], mask: typing.Annotated[numpy.typing.ArrayLike, numpy.bool], other: numpy.ndarray | None, dtype: typing.Any) -> numpy.ndarray[typing.Any, numpy.dtype[typing.Any]]:
     """
         Load data from memory addresses or fallback array based on mask.
-    
+
         Args:
             ptr (numpy.ndarray): Memory addresses to load from.
             mask (numpy.ndarray): Mask to apply.
@@ -181,7 +181,7 @@ def load(ptr: typing.Annotated[numpy.typing.ArrayLike, numpy.uint64], mask: typi
 def parallel_launch(fn: collections.abc.Callable, grid_dim: collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex], builder: typing.Any) -> None:
     """
         Launch kernel in parallel.
-    
+
         Args:
             fn (function): The kernel function to launch.
             grid_dim (list): The grid dimension.
@@ -190,7 +190,7 @@ def parallel_launch(fn: collections.abc.Callable, grid_dim: collections.abc.Sequ
 def store(ptr: typing.Annotated[numpy.typing.ArrayLike, numpy.uint64], value: numpy.ndarray[typing.Any, numpy.dtype[typing.Any]], mask: typing.Annotated[numpy.typing.ArrayLike, numpy.bool]) -> None:
     """
         Store data to memory addresses based on mask.
-    
+
         Args:
             ptr (numpy.ndarray): Memory addresses to store to.
             value (numpy.ndarray): Values to store.

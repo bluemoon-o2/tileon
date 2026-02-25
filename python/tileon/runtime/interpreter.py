@@ -59,10 +59,8 @@ class TensorHandle:
 
     def __post_init__(self):
         if not _validate_np_data_size(self.data, self.dtype):
-            raise ValueError(
-                f"numpy data itemsize ({self.data.itemsize * 8} bits) exceeds dtype primitive_bitwidth "
-                f"({self.dtype.primitive_bitwidth} bits) for tileon type {self.dtype}"
-            )
+            raise ValueError(f"numpy data itemsize ({self.data.itemsize * 8} bits) exceeds dtype primitive_bitwidth "
+                             f"({self.dtype.primitive_bitwidth} bits) for tileon type {self.dtype}")
 
     def __bool__(self):
         return bool(self.data.all())
@@ -89,15 +87,8 @@ class TensorHandle:
 class BlockPointerHandle:
     """A handle for block pointer tensor."""
 
-    def __init__(
-        self, 
-        base: TensorHandle,
-        shape: List[TensorHandle],
-        strides: List[TensorHandle],
-        offsets: List[TensorHandle],
-        block_shape: List[int],
-        order: List[int]
-    ):
+    def __init__(self, base: TensorHandle, shape: List[TensorHandle], strides: List[TensorHandle],
+                 offsets: List[TensorHandle], block_shape: List[int], order: List[int]):
         self.base = base
         self.shape = shape
         self.strides = strides
@@ -132,14 +123,8 @@ class BlockPointerHandle:
 class TensorDescHandle:
     """A handle for tensor descriptor tensor."""
 
-    def __init__(
-        self,
-        base: TensorHandle,
-        shape: List[TensorHandle],
-        strides: List[TensorHandle],
-        block_shape: List[int],
-        padding: List[Tuple[int, int]]
-    ):
+    def __init__(self, base: TensorHandle, shape: List[TensorHandle], strides: List[TensorHandle],
+                 block_shape: List[int], padding: List[Tuple[int, int]]):
         self.base = base
         self.ndim = len(shape)
         self.shape = shape
@@ -172,7 +157,7 @@ class TensorDescHandle:
         """
         assert len(offsets) == self.ndim, "number of offsets must match number of dimensions"
         itemsize = self.base.dtype.element_t.primitive_bitwidth // 8
-        assert (offsets[-1].data * itemsize ) % 16 == 0, "block offset start must be 16-byte aligned"
+        assert (offsets[-1].data * itemsize) % 16 == 0, "block offset start must be 16-byte aligned"
         ptrs_data = np.broadcast_to(self.base.data, self.block_shape)
         masks = np.ones(self.block_shape, dtype=bool)
         for dim in range(len(self.block_shape)):
@@ -334,18 +319,15 @@ def _convert_float(input, input_dtype: tl.dtype, output_dtype: tl.dtype, roundin
         exponent[subnormal_index] = 1 - bit_pos[subnormal_index]
         # 0 significand and subnormal should be treated as 0
         exponent[zero_significand_index & subnormal_index] = bias_input - bias_output
-        significand[subnormal_index] = (
-            (significand[subnormal_index] << bit_pos[subnormal_index]) & ((1 << input_dtype.fp_mantissa_width) - 1)
-        )
+        significand[subnormal_index] = ((significand[subnormal_index] << bit_pos[subnormal_index]) &
+                                        ((1 << input_dtype.fp_mantissa_width) - 1))
     # Prevent overflow and underflow
     exponent_output = np.maximum(0, np.minimum((exponent - bias_input + bias_output), (1 << output_exponent_width) - 1))
     exponent_output = exponent_output.astype(output_unint_dtype)
     sign_output = sign.astype(output_unint_dtype)
     if input_dtype.primitive_bitwidth > output_dtype.primitive_bitwidth:  # Downcast
         shift = input_dtype.fp_mantissa_width - output_dtype.fp_mantissa_width
-        significand_output = (
-            (significand >> shift) & ((1 << output_dtype.fp_mantissa_width) - 1)
-        )
+        significand_output = ((significand >> shift) & ((1 << output_dtype.fp_mantissa_width) - 1))
         if rounding_mode == _ir.ROUNDING_MODE.RTNE:  # Round to nearst even
             cutoff_mask = (1 << (shift - 1))
             sticky_mask = cutoff_mask - 1
@@ -353,7 +335,7 @@ def _convert_float(input, input_dtype: tl.dtype, output_dtype: tl.dtype, roundin
             sticky = (significand & sticky_mask) > 0
             lsb = (significand_output & 1) > 0
             round_up = cutoff & (sticky | lsb)
-            
+
             # Apply rounding only to normal results (exponent_output > 0)
             # Subnormals are handled in the subnormal block with higher precision
             normal_mask = exponent_output > 0
@@ -367,12 +349,12 @@ def _convert_float(input, input_dtype: tl.dtype, output_dtype: tl.dtype, roundin
                 # Cap at max exponent to avoid wrapping into sign bit (though it implies Inf)
                 max_exp = (1 << output_exponent_width) - 1
                 exponent_output[overflow] = np.minimum(exponent_output[overflow], max_exp)
-                
+
         significand_output = significand_output.astype(output_unint_dtype)
     else:  # Upcast
-        significand_output = (
-            (significand.astype(output_unint_dtype) << (output_dtype.fp_mantissa_width - input_dtype.fp_mantissa_width)) & ((1 << output_dtype.fp_mantissa_width) - 1)
-        )
+        significand_output = ((significand.astype(output_unint_dtype) <<
+                               (output_dtype.fp_mantissa_width - input_dtype.fp_mantissa_width))
+                              & ((1 << output_dtype.fp_mantissa_width) - 1))
     subnormal_index = exponent_output == 0
     if np.any(subnormal_index):  # underflow
         # normal repr: ((-1.0)**sign) * (2.0**(exp - exp_bias_input)) * (1 + 2^(m0) + 2^(m1) + ... + 2^(mn))
@@ -383,22 +365,22 @@ def _convert_float(input, input_dtype: tl.dtype, output_dtype: tl.dtype, roundin
         non_zero_exponent_index = exponent != 0
         # If the original exponent is not zero, we still need to shift the significand and consider the 1.0 part in mantissa
         subnormal_index = subnormal_index & non_zero_exponent_index
-        
+
         # Calculate full precision mantissa for subnormal case
         shift = np.zeros_like(input_bin, dtype=np.int32)
         shift[subnormal_index] = (1 - bias_output) - (exponent[subnormal_index] - bias_input)
-        
+
         # Calculate shift amount relative to input significand position
         shift_amt = (input_dtype.fp_mantissa_width - output_dtype.fp_mantissa_width) + shift[subnormal_index]
-        
+
         # Reconstruct full mantissa (implicit bit + significand bits)
         # implicit bit is at bit 23.
         full_mant = (1 << input_dtype.fp_mantissa_width) | significand[subnormal_index]
-        
+
         # Apply shift
         # shift_amt is at least 13 + 1 = 14.
         res_mant = full_mant >> shift_amt
-        
+
         # Apply rounding (RTNE)
         if rounding_mode == _ir.ROUNDING_MODE.RTNE:
             cutoff_mask = (1 << (shift_amt - 1))
@@ -408,7 +390,7 @@ def _convert_float(input, input_dtype: tl.dtype, output_dtype: tl.dtype, roundin
             lsb = (res_mant & 1) > 0
             round_up = cutoff & (sticky | lsb)
             res_mant = res_mant + round_up
-            
+
             # Check if rounding caused overflow to normal range
             # If res_mant becomes (1 << output_dtype.fp_mantissa_width), it is normal!
             # It means exp becomes 1, and mant becomes 0.
@@ -418,21 +400,14 @@ def _convert_float(input, input_dtype: tl.dtype, output_dtype: tl.dtype, roundin
             # So no explicit exponent update is needed.
 
         significand_output[subnormal_index] = res_mant
-    output = (sign_output << (output_dtype.primitive_bitwidth - 1)) | (exponent_output << output_dtype.fp_mantissa_width) | significand_output
+    output = (sign_output << (output_dtype.primitive_bitwidth - 1)) | (
+        exponent_output << output_dtype.fp_mantissa_width) | significand_output
     return output.reshape(input.shape)
 
 
-def _convert_custom_types(
-    input, 
-    dst_t, 
-    fp_downcast_rounding, 
-    _semantic
-):
+def _convert_custom_types(input, dst_t, fp_downcast_rounding, _semantic):
     """Convert custom types to fp types."""
-    return tl.tensor(
-        _semantic.builder.create_fp_to_fp(input.handle, dst_t, fp_downcast_rounding),
-        dst_t
-    )
+    return tl.tensor(_semantic.builder.create_fp_to_fp(input.handle, dst_t, fp_downcast_rounding), dst_t)
 
 
 def _erf(x):
@@ -456,14 +431,10 @@ np_umulhi_u64 = np.vectorize(_umulhi_64, otypes=[np.uint64])
 
 class InterpreterBuilder:
     ir_sem_to_interpreter_sem = {
-        _ir.MEM_SEMANTIC.ACQUIRE:
-        _interpreter.MEM_SEMANTIC.ACQUIRE,
-        _ir.MEM_SEMANTIC.RELEASE:
-        _interpreter.MEM_SEMANTIC.RELEASE,
-        _ir.MEM_SEMANTIC.RELAXED:
-        _interpreter.MEM_SEMANTIC.RELAXED,
-        _ir.MEM_SEMANTIC.ACQUIRE_RELEASE:
-        _interpreter.MEM_SEMANTIC.ACQUIRE_RELEASE,
+        _ir.MEM_SEMANTIC.ACQUIRE: _interpreter.MEM_SEMANTIC.ACQUIRE,
+        _ir.MEM_SEMANTIC.RELEASE: _interpreter.MEM_SEMANTIC.RELEASE,
+        _ir.MEM_SEMANTIC.RELAXED: _interpreter.MEM_SEMANTIC.RELAXED,
+        _ir.MEM_SEMANTIC.ACQUIRE_RELEASE: _interpreter.MEM_SEMANTIC.ACQUIRE_RELEASE,
     }
 
     ir_rmw_op_to_interpreter_rmw_op = {
@@ -709,10 +680,8 @@ class InterpreterBuilder:
         """
         src_element_type = src.dtype.scalar
         dst_element_type = dst_type.scalar
-        if (
-            (src_element_type == tl.bfloat16 and dst_element_type == tl.float32)
-            or (src_element_type == tl.float32 and dst_element_type == tl.bfloat16)
-        ):
+        if ((src_element_type == tl.bfloat16 and dst_element_type == tl.float32)
+                or (src_element_type == tl.float32 and dst_element_type == tl.bfloat16)):
             data = _convert_float(src.data, src_element_type, dst_element_type, None).view(_get_np_dtype(dst_type))
             return TensorHandle(data, dst_type.scalar)
         else:
@@ -934,7 +903,7 @@ class InterpreterBuilder:
     # -----------------------------------------------------------------------------
     # Unary Operators
     # -----------------------------------------------------------------------------
-    
+
     def unary_op(self, arg, op):
         """
         Tileon's unary_op instruction performs a unary operation on a tensor.
@@ -1007,7 +976,7 @@ class InterpreterBuilder:
     # -----------------------------------------------------------------------------
     # Tensor Operators
     # -----------------------------------------------------------------------------
-    
+
     def create_reshape(self, arg, shape, allow_reorder):
         """
         Tileon's reshape instruction reshapes the input tensor to the specified shape.
@@ -1051,10 +1020,8 @@ class InterpreterBuilder:
         """
         a_data = a.data
         b_data = b.data
-        if (
-            (a.dtype.primitive_bitwidth == 8 and a.dtype.is_floating())
-            or (b.dtype.primitive_bitwidth == 8 and b.dtype.is_floating())
-        ):
+        if ((a.dtype.primitive_bitwidth == 8 and a.dtype.is_floating())
+                or (b.dtype.primitive_bitwidth == 8 and b.dtype.is_floating())):
             a_data = _convert_float(a_data, a.dtype, tl.float16, None).view(np.float16)
             b_data = _convert_float(b_data, b.dtype, tl.float16, None).view(np.float16)
         return TensorHandle(np.matmul(a_data, b_data, dtype=d.data.dtype) + d.data, d.dtype.scalar)
@@ -1138,15 +1105,8 @@ class InterpreterBuilder:
         element_bytewidth = max(1, element_bitwidth // 8)
         return TensorHandle(ptr.data + element_bytewidth * offset.data.astype(np.uint64), ptr.dtype)
 
-    def create_tensor_pointer_load(
-        self,
-        ptr,
-        boundary_check,
-        padding_option,
-        cache_modifier,
-        eviction_policy,
-        is_volatile
-    ):
+    def create_tensor_pointer_load(self, ptr, boundary_check, padding_option, cache_modifier, eviction_policy,
+                                   is_volatile):
         """
         Tileon's load instruction loads data from a tensor pointer.
 
@@ -1174,14 +1134,7 @@ class InterpreterBuilder:
             raise ValueError(f"unsupported padding option {padding_option}")
         return self.create_masked_load(ptrs, masks, other, cache_modifier, eviction_policy, is_volatile)
 
-    def create_tensor_pointer_store(
-        self,
-        ptr,
-        value,
-        boundary_check,
-        cache_modifier,
-        eviction_policy
-    ):
+    def create_tensor_pointer_store(self, ptr, value, boundary_check, cache_modifier, eviction_policy):
         """
         Tileon's store instruction stores data to a tensor pointer.
 
@@ -1433,15 +1386,13 @@ class InterpreterBuilder:
             ret.offsets[i].data += offsets[i].data
         return ret
 
-    def create_make_tensor_descriptor(
-        self,
-        base: TensorHandle,
-        shape: List[TensorHandle],
-        strides: List[TensorHandle],
-        tensor_shape: List[int],
-        is_signed: bool,
-        padding: str = "zero"
-    ):
+    def create_make_tensor_descriptor(self,
+                                      base: TensorHandle,
+                                      shape: List[TensorHandle],
+                                      strides: List[TensorHandle],
+                                      tensor_shape: List[int],
+                                      is_signed: bool,
+                                      padding: str = "zero"):
         """
         Tileon's make_tensor_descriptor instruction creates a tensor descriptor.
 
@@ -1460,13 +1411,8 @@ class InterpreterBuilder:
         desc.validate()
         return desc
 
-    def create_descriptor_load(
-        self,
-        desc: TensorDescHandle,
-        indices: List[TensorHandle],
-        cache_modifier,
-        eviction_policy
-    ):
+    def create_descriptor_load(self, desc: TensorDescHandle, indices: List[TensorHandle], cache_modifier,
+                               eviction_policy):
         """
         Tileon's descriptor_load instruction loads data from a tensor descriptor.
 
@@ -1490,21 +1436,14 @@ class InterpreterBuilder:
             other = TensorHandle(np.full_like(ptrs.data, float('nan'), dtype=dtype_np), dtype_tt)
         else:
             raise ValueError(f"unsupported padding {padding}")
-        return self.create_masked_load(
-            ptrs,
-            mask,
-            other,
-            cache_modifier=cache_modifier,
-            eviction_policy=eviction_policy,
-            is_volatile=False
-        )
+        return self.create_masked_load(ptrs,
+                                       mask,
+                                       other,
+                                       cache_modifier=cache_modifier,
+                                       eviction_policy=eviction_policy,
+                                       is_volatile=False)
 
-    def create_descriptor_store(
-        self,
-        desc: TensorDescHandle,
-        value: TensorHandle,
-        indices: List[TensorHandle]
-    ):
+    def create_descriptor_store(self, desc: TensorDescHandle, value: TensorHandle, indices: List[TensorHandle]):
         """
         Tileon's descriptor_store instruction stores data to a tensor descriptor.
 
@@ -1517,21 +1456,9 @@ class InterpreterBuilder:
             None
         """
         ptrs, mask = desc.materialize_pointers(indices)
-        return self.create_masked_store(
-            ptrs,
-            value,
-            mask,
-            None,
-            None
-        )
+        return self.create_masked_store(ptrs, value, mask, None, None)
 
-    def create_descriptor_gather(
-        self,
-        desc: TensorDescHandle,
-        x_offsets: TensorHandle,
-        y_offset: TensorHandle,
-        type
-    ):
+    def create_descriptor_gather(self, desc: TensorDescHandle, x_offsets: TensorHandle, y_offset: TensorHandle, type):
         """
         Tileon's descriptor_gather instruction gathers data from a tensor descriptor.
 
@@ -1546,8 +1473,7 @@ class InterpreterBuilder:
         """
         dtype = desc.base.dtype.element_t
         np_dtype = _get_np_dtype(dtype)
-        result = np.zeros([x_offsets.data.shape[0], desc.block_shape[-1]],
-                          dtype=np_dtype)
+        result = np.zeros([x_offsets.data.shape[0], desc.block_shape[-1]], dtype=np_dtype)
         cache_modifier = None
         eviction_policy = None
         for i, x_offset in enumerate(x_offsets.data):
@@ -1555,13 +1481,8 @@ class InterpreterBuilder:
             result[i, :] = self.create_descriptor_load(desc, indices, cache_modifier, eviction_policy).data
         return TensorHandle(result, dtype)
 
-    def create_descriptor_scatter(
-        self,
-        desc: TensorDescHandle,
-        value: TensorHandle,
-        x_offsets: TensorHandle,
-        y_offset: TensorHandle
-    ):
+    def create_descriptor_scatter(self, desc: TensorDescHandle, value: TensorHandle, x_offsets: TensorHandle,
+                                  y_offset: TensorHandle):
         """
         Tileon's descriptor_scatter instruction scatters data to a tensor descriptor.
 
@@ -1635,11 +1556,11 @@ class _LangPatchScope:
 def _patch_attr(obj, name, member, builder, scope: _LangPatchScope):
     """Replace a member function with a wrapper that injects the semantic."""
     new_member = (
-        lambda *args, member=member, **kwargs: (
-            member(*args, **{k: v for k, v in kwargs.items() if k != "_semantic"}, 
-            _semantic=interpreter_semantic)
-        )
-    )
+        lambda *args, member=member, **kwargs:
+        (member(*args, **{
+            k: v
+            for k, v in kwargs.items() if k != "_semantic"
+        }, _semantic=interpreter_semantic)))
     scope.set_attr(obj, name, new_member)
 
 
@@ -1710,7 +1631,7 @@ class ReduceScanOpInterface:
         Args:
             ret (np.ndarray): Numpy array.
             dtype (DataType): Data type.
-        
+
         Returns:
             Tensor: Tensor.
         """
@@ -1732,7 +1653,7 @@ class ReduceScanOpInterface:
 
         Args:
             input (Tensor): Input tensor.
-        
+
         Returns:
             Tensor: Output tensor.
         """
@@ -1757,7 +1678,7 @@ class ReduceOps(ReduceScanOpInterface):
         Args:
             input (Tensor): Input tensor.
             axis (int): Axis to unravel.
-        
+
         Returns:
             tuple: Unraveled input tensor.
         """
@@ -1776,7 +1697,7 @@ class ReduceOps(ReduceScanOpInterface):
 
         Args:
             input (Tensor): Input tensor.
-        
+
         Returns:
             Tensor: Output tensor.
         """
@@ -1794,17 +1715,13 @@ class ReduceOps(ReduceScanOpInterface):
             # Recover input_index from i using input_shape
             input_index = np.unravel_index(i, input_shape)
             output_index = input_index[0:axis] + input_index[axis + 1:]
-            input_tuple = tuple(
-                self.to_tensor(d[input_index], input[ii].dtype) for ii, d in enumerate(input_data)
-            )
+            input_tuple = tuple(self.to_tensor(d[input_index], input[ii].dtype) for ii, d in enumerate(input_data))
             if input_index[axis] == 0:
                 # First element
                 for j in range(len(output_data)):
                     output_data[j][output_index] = input_tuple[j].handle.data.item()
             else:
-                acc_tuple = tuple(
-                    self.to_tensor(o[output_index], input[oi].dtype) for oi, o in enumerate(output_data)
-                )
+                acc_tuple = tuple(self.to_tensor(o[output_index], input[oi].dtype) for oi, o in enumerate(output_data))
                 combine_fn_ret = self.combine_fn.fn(*acc_tuple, *input_tuple)
                 acc_tuple = (combine_fn_ret, ) if not isinstance(combine_fn_ret, tuple) else combine_fn_ret
                 for j in range(len(output_data)):
@@ -1835,7 +1752,7 @@ class ReduceOps(ReduceScanOpInterface):
             input (Tensor): Input tensor.
             val_reduce_op (Callable): Value reduction operator.
             idx_reduce_op (Callable, optional): Index reduction operator. Defaults to None.
-        
+
         Returns:
             Tensor: Output tensor.
         """
@@ -1862,7 +1779,7 @@ class ReduceOps(ReduceScanOpInterface):
 
         Args:
             input (Tensor): Input tensor.
-        
+
         Returns:
             Tensor: Output tensor.
         """
@@ -1893,14 +1810,14 @@ class ScanOps(ReduceScanOpInterface):
 
     def cumsum(self, input):
         return [self.to_tensor(np.cumsum(input.handle.data, axis=self.axis), dtype=input.dtype)]
-    
+
     def cumprod(self, input):
         """
         Cumulative product reduction.
 
         Args:
             input (Tensor): Input tensor.
-        
+
         Returns:
             Tensor: Output tensor.
         """
@@ -1912,7 +1829,7 @@ class ScanOps(ReduceScanOpInterface):
 
         Args:
             input (Tensor): Input tensor.
-        
+
         Returns:
             Tensor: Output tensor.
         """
@@ -1932,12 +1849,8 @@ class ScanOps(ReduceScanOpInterface):
                 for j in range(len(output_data)):
                     output_data[j][index] = data[j].handle.data.item()
             else:
-                prev_index = tuple(
-                    index[i] - 1 if i == self.axis else index[i] for i in range(len(index))
-                )
-                acc_tuple = tuple(
-                    self.to_tensor(o[prev_index], input[oi].dtype) for oi, o in enumerate(output_data)
-                )
+                prev_index = tuple(index[i] - 1 if i == self.axis else index[i] for i in range(len(index)))
+                acc_tuple = tuple(self.to_tensor(o[prev_index], input[oi].dtype) for oi, o in enumerate(output_data))
                 combine_fn_ret = self.combine_fn.fn(*acc_tuple, *data)
                 acc_tuple = (combine_fn_ret, ) if not isinstance(combine_fn_ret, tuple) else combine_fn_ret
                 for j in range(len(output_data)):
@@ -1971,6 +1884,7 @@ class ScanOps(ReduceScanOpInterface):
 
 def _patch_reduce_scan(scope: _LangPatchScope):
     """Patch the reduce and scan operations."""
+
     def _new_reduce(input, axis, combine_fn, keep_dims=False, **kwargs):
         return ReduceOps(axis, combine_fn, keep_dims).apply(input)
 
@@ -1984,6 +1898,7 @@ def _patch_reduce_scan(scope: _LangPatchScope):
 
 
 def _patch_lang_core(lang, scope: _LangPatchScope):
+
     def _new_to_ir(self, builder):
         """Convert the type to the Tileon IR type."""
         if self.name == 'void':
@@ -2087,13 +2002,13 @@ def _implicit_cvt(arg):
     if isinstance(arg, int):
         ty = tl.str_to_t(tileon.runtime.jit.mangle_type(arg), None)
         dtype = np.int32
-        if -2 ** 31 <= arg < 2 ** 31:
+        if -2**31 <= arg < 2**31:
             dtype = np.int32
-        elif 2 ** 31 <= arg < 2 ** 32:
+        elif 2**31 <= arg < 2**32:
             dtype = np.uint32
-        elif -2 ** 63 <= arg < 2 ** 63:
+        elif -2**63 <= arg < 2**63:
             dtype = np.int64
-        elif 2 ** 63 <= arg < 2 ** 64:
+        elif 2**63 <= arg < 2**64:
             dtype = np.uint64
         else:
             raise ValueError(f"Unsupported integer value {arg}")
@@ -2109,13 +2024,11 @@ def _implicit_cvt(arg):
         strides = [_implicit_cvt(s) for s in arg.strides]
         assert arg.strides[-1] == 1
         strides[-1] = tl.constexpr(1)
-        return interpreter_semantic.make_tensor_descriptor(
-            base=_implicit_cvt(arg.base),
-            shape=[_implicit_cvt(s) for s in arg.shape], 
-            strides=strides,
-            block_shape=[tl.constexpr(b) for b in arg.block_shape],
-            padding_option=arg.padding
-        )
+        return interpreter_semantic.make_tensor_descriptor(base=_implicit_cvt(arg.base),
+                                                           shape=[_implicit_cvt(s) for s in arg.shape],
+                                                           strides=strides,
+                                                           block_shape=[tl.constexpr(b) for b in arg.block_shape],
+                                                           padding_option=arg.padding)
     return arg
 
 
@@ -2150,14 +2063,8 @@ class GridExecutor:
         self.arg_names = arg_names
         self.grid = grid
         self.pre_run_hooks = pre_run_hooks
-        __annotations__ = {
-            name: _normalize_t(ty)
-            for name, ty in fn.__annotations__.items()
-        }
-        self.constexprs = [
-            name for name in arg_names
-            if __annotations__.get(name) == "constexpr"
-        ]
+        __annotations__ = {name: _normalize_t(ty) for name, ty in fn.__annotations__.items()}
+        self.constexprs = [name for name in arg_names if __annotations__.get(name) == "constexpr"]
 
     def _init_args_hst(self, args_dev: list, kwargs: dict):
         """Initialize host arguments from device arguments."""
@@ -2198,17 +2105,14 @@ class GridExecutor:
             kwargs_hst[key] = _to_cpu(value)
         return args_hst, kwargs_hst
 
-    def _restore_args_dev(self, args_dev: list, args_hst: list, kwargs: dict,
-                          kwargs_hst: dict):
+    def _restore_args_dev(self, args_dev: list, args_hst: list, kwargs: dict, kwargs_hst: dict):
         """Restore device arguments from host arguments."""
         storages = {}
 
         def _from_cpu(arg_dev, arg_hst):
             if hasattr(arg_dev, "data_ptr"):
                 arg_dev, arg_hst = _unwrap_tensor(arg_dev), _unwrap_tensor(arg_hst)
-                storages[arg_dev.untyped_storage().data_ptr()] = (
-                    arg_dev.untyped_storage(), arg_hst.untyped_storage()
-                )
+                storages[arg_dev.untyped_storage().data_ptr()] = (arg_dev.untyped_storage(), arg_hst.untyped_storage())
             elif isinstance(arg_dev, tuple):
                 for (arg_dev, arg_hst) in zip(arg_dev, arg_hst):
                     _from_cpu(arg_dev, arg_hst)
@@ -2241,10 +2145,7 @@ class GridExecutor:
         patch_scope = _patch_lang(self.fn)
         try:
             args = inspect.getcallargs(self.fn, *args_hst, **kwargs_hst)
-            args = {
-                name: arg if name in self.constexprs else _implicit_cvt(arg)
-                for name, arg in args.items()
-            }
+            args = {name: arg if name in self.constexprs else _implicit_cvt(arg) for name, arg in args.items()}
 
             grid = self.grid(args) if callable(self.grid) else self.grid
             assert len(grid) <= 3, "grid must have at most 3 dimensions"
@@ -2275,78 +2176,12 @@ class ASTTransformer(ast.NodeTransformer):
         if len(names) > 1:
             raise ValueError("Multiple assignments are not supported")
         # x = value -> interpreter_semantic.to_tensor(value, False)
-        node.value = ast.Call(
-            func=ast.Attribute(
-                value=ast.Name(id="interpreter_semantic", ctx=ast.Load()), 
-                attr="to_tensor",
-                ctx=ast.Load()
-            ), 
-            args=[node.value, ast.Constant(value=False)], 
-            keywords=[]
-        )
+        node.value = ast.Call(func=ast.Attribute(value=ast.Name(id="interpreter_semantic", ctx=ast.Load()),
+                                                 attr="to_tensor",
+                                                 ctx=ast.Load()),
+                              args=[node.value, ast.Constant(value=False)],
+                              keywords=[])
         return node
-
-
-class FunctionRewriter:
-    """
-    Function rewriter to rewrite assignments to tensors to use the interpreter semantic.
-    """
-    ast_transformer = ASTTransformer()
-
-    def __init__(self, fn, **kwargs):
-        self.fn = fn
-        self.kwargs = kwargs
-        self.filename: str = ""
-        # Absolute line number in the file
-        self.def_file_lineno: int = 0
-
-    def _get_jit_fn_file_line(self) -> Tuple[str, int]:
-        from .jit import get_jit_fn_file_line
-        return get_jit_fn_file_line(JITCallable(self.fn))
-
-    def _find_def(self, lines: List[str]) -> int:
-        def_lineno = 0
-        # Line numbers start from 1
-        for i, line in enumerate(lines):
-            if line.strip().startswith("def "):
-                def_lineno = i + 1
-        return def_lineno
-
-    def _prepare_source(self, lines: List[str]) -> str:
-        lines = lines[self.def_lineno - 1:]
-        src = ''.join(lines)
-        return textwrap.dedent(src)
-
-    def _transform_ast(self, src: str) -> ast.AST:
-        parsed_ast = ast.parse(src)
-        transformed_ast = self.ast_transformer.visit(parsed_ast)
-        ast.fix_missing_locations(transformed_ast)
-        inc_lineno = self.def_file_lineno - 1
-        ast.increment_lineno(transformed_ast, inc_lineno)
-        return transformed_ast
-
-    def _compile_and_exec(self, transformed_ast: ast.AST) -> Callable:
-        compiled_code = compile(transformed_ast, filename=self.filename, mode='exec')
-        local_namespace = {**self.kwargs}
-        fn_globals = self.fn.__globals__
-        for key, value in globals().items():
-            if key not in fn_globals:
-                fn_globals[key] = value
-        exec(compiled_code, fn_globals, local_namespace)
-        return local_namespace[self.fn.__name__]
-
-    def rewrite_ast(self):
-        try:
-            lines, _ = inspect.getsourcelines(self.fn)
-        except Exception:
-            # it is dynamically generated function
-            return self.fn
-
-        self.filename, self.def_file_lineno = self._get_jit_fn_file_line()
-        self.def_lineno = self._find_def(lines)
-        src = self._prepare_source(lines)
-        transformed_ast = self._transform_ast(src)
-        return self._compile_and_exec(transformed_ast)
 
 
 class FunctionRewriter:

@@ -31,6 +31,12 @@ __all__ = [
     "next_power_of_2",
     "jit",
     "constexpr_function",
+    "KernelInterface",
+    "reinterpret",
+    "TileonTensor",
+    "OutOfResources",
+    "InterpreterError",
+    "MockTensor",
 ]
 
 

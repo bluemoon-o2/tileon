@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import os
-from typing import List, Any, Dict, Callable
+from typing import List, Any, Dict, Callable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 DEFAULT_COLORS = [
-    '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b',
-    '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
+    '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
 ]
 DEFAULT_LINESTYLES = ['-', '--', '-.', ':']
 DEFAULT_FIGSIZE = (10, 6)
@@ -32,26 +34,24 @@ def _add_watermark(ax, logo_path=None, text='Tileon', alpha=0.15):
             from PIL import Image
             img = Image.open(logo_path)
             fig = ax.figure
-            fig.figimage(
-                img,
-                fig.bbox.xmin + x * fig.bbox.width - img.width / 2,
-                fig.bbox.ymin + y * fig.bbox.height - img.height / 2,
-                alpha=alpha,
-                zorder=0
-            )
+            fig.figimage(img,
+                         fig.bbox.xmin + x * fig.bbox.width - img.width / 2,
+                         fig.bbox.ymin + y * fig.bbox.height - img.height / 2,
+                         alpha=alpha,
+                         zorder=0)
         else:
-            ax.text(
-                x, y, text,
-                fontsize=100,
-                fontweight='bold',
-                fontname=DEFAULT_FONT_NAME,
-                color='gray',
-                alpha=alpha,
-                ha='center',
-                va='center',
-                transform=ax.figure.transFigure,
-                zorder=0
-            )
+            ax.text(x,
+                    y,
+                    text,
+                    fontsize=100,
+                    fontweight='bold',
+                    fontname=DEFAULT_FONT_NAME,
+                    color='gray',
+                    alpha=alpha,
+                    ha='center',
+                    va='center',
+                    transform=ax.figure.transFigure,
+                    zorder=0)
     except Exception:
         pass
 
@@ -127,14 +127,13 @@ class Mark:
         self.benchmarks = benchmarks
 
     def _run(self,
-        bench: Benchmark,
-        save_path: str,
-        show_plots: bool,
-        print_data: bool,
-        diff_col: bool = False,
-        save_precision: int = 6,
-        **kwrags
-    ) -> "pd.DataFrame":
+             bench: Benchmark,
+             save_path: str,
+             show_plots: bool,
+             print_data: bool,
+             diff_col: bool = False,
+             save_precision: int = 6,
+             **kwrags) -> "pd.DataFrame":
         """Run a single benchmark.
 
         Args:
@@ -197,9 +196,7 @@ class Mark:
 
             # Plot first x value on x axis if there are multiple.
             first_x = x_names[0]
-            for i, (mean_label, min_label, max_label) in enumerate(
-                    zip(y_mean_labels, y_min_labels, y_max_labels)
-                ):
+            for i, (mean_label, min_label, max_label) in enumerate(zip(y_mean_labels, y_min_labels, y_max_labels)):
                 y_min, y_max = df[min_label], df[max_label]
                 if bench.styles:
                     col = bench.styles[i][0]
@@ -208,17 +205,15 @@ class Mark:
                     col = DEFAULT_COLORS[i % len(DEFAULT_COLORS)]
                     sty = DEFAULT_LINESTYLES[i % len(DEFAULT_LINESTYLES)]
 
-                ax.plot(
-                    df[first_x],
-                    df[mean_label],
-                    label=mean_label,
-                    color=col,
-                    linestyle=sty,
-                    linewidth=2,
-                    marker='o',
-                    markersize=4,
-                    zorder=3
-                )
+                ax.plot(df[first_x],
+                        df[mean_label],
+                        label=mean_label,
+                        color=col,
+                        linestyle=sty,
+                        linewidth=2,
+                        marker='o',
+                        markersize=4,
+                        zorder=3)
                 if not y_min.isnull().all() and not y_max.isnull().all():
                     y_min = y_min.astype(float)
                     y_max = y_max.astype(float)
@@ -236,11 +231,7 @@ class Mark:
                 plt.show()
             if save_path:
                 os.makedirs(save_path, exist_ok=True)
-                plt.savefig(
-                    os.path.join(save_path, f"{bench.plot_name}.png"),
-                    bbox_inches='tight',
-                    dpi=DEFAULT_DPI
-                )
+                plt.savefig(os.path.join(save_path, f"{bench.plot_name}.png"), bbox_inches='tight', dpi=DEFAULT_DPI)
                 plt.close()
 
         df = df[x_names + y_mean_labels]
@@ -252,21 +243,17 @@ class Mark:
             print(bench.plot_name + ':')
             print(df.to_string())
         if save_path:
-            df.to_csv(
-                os.path.join(save_path, f"{bench.plot_name}.csv"),
-                float_format=f"%.{save_precision}f",
-                index=False
-            )
+            df.to_csv(os.path.join(save_path, f"{bench.plot_name}.csv"),
+                      float_format=f"%.{save_precision}f",
+                      index=False)
         return df
 
-    def run(
-        self,
-        show_plots: bool = False,
-        print_data: bool = False,
-        save_path: str = '',
-        return_df: bool = False,
-        **kwargs
-    ) -> "pd.DataFrame" | None:
+    def run(self,
+            show_plots: bool = False,
+            print_data: bool = False,
+            save_path: str = '',
+            return_df: bool = False,
+            **kwargs) -> "pd.DataFrame" | None:
         """Run the benchmarks.
 
         Args:
@@ -314,5 +301,8 @@ def perf_report(benchmarks: List[Benchmark]):
     Returns:
         Decorated function wrapped in a Mark object.
     """
-    wrapper = lambda fn: Mark(fn, benchmarks)
+
+    def wrapper(fn):
+        return Mark(fn, benchmarks)
+
     return wrapper

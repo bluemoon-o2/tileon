@@ -3,8 +3,7 @@ from typing import Callable, Optional
 from concurrent.futures import Executor, as_completed, Future
 from contextvars import ContextVar
 
-active_mode: ContextVar[Optional[AsyncCompileMode]] = ContextVar(
-    "async_compile_active_mode", default=None)
+active_mode: ContextVar[Optional[AsyncCompileMode]] = ContextVar("async_compile_active_mode", default=None)
 
 
 class FutureKernel:

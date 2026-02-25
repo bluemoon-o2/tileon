@@ -4,10 +4,10 @@ from ..runtime.jit import jit, constexpr_function
 from . import core
 from . import math
 
-
 # -----------------------------------------------------------------------------
 # constexpr utilities
 # -----------------------------------------------------------------------------
+
 
 @constexpr_function
 def _log2(i):
@@ -238,24 +238,16 @@ def _elementwise_max(a, b):
 
 @core.tensor_member
 @jit
-@core.add_reduction_docstr("maximum", return_indices_arg="return_indices", tie_break_arg="return_indices_tie_break_left")
-def max(
-    input,
-    axis=None,
-    return_indices=False,
-    return_indices_tie_break_left=True,
-    keep_dims=False
-):
+@core.add_reduction_docstr("maximum",
+                           return_indices_arg="return_indices",
+                           tie_break_arg="return_indices_tie_break_left")
+def max(input, axis=None, return_indices=False, return_indices_tie_break_left=True, keep_dims=False):
     input = core._promote_bf16_to_f32(input)
     if return_indices:
         if return_indices_tie_break_left:
-            return core._reduce_with_indices(
-                input, axis, _argmax_combine_tie_break_left, keep_dims=keep_dims
-            )
+            return core._reduce_with_indices(input, axis, _argmax_combine_tie_break_left, keep_dims=keep_dims)
         else:
-            return core._reduce_with_indices(
-                input, axis, _argmax_combine_tie_break_fast, keep_dims=keep_dims
-            )
+            return core._reduce_with_indices(input, axis, _argmax_combine_tie_break_fast, keep_dims=keep_dims)
     else:
         if core.constexpr(input.dtype.primitive_bitwidth) < core.constexpr(32):
             if core.constexpr(input.dtype.is_floating()):
@@ -326,24 +318,16 @@ def _elementwise_min(a, b):
 
 @core.tensor_member
 @jit
-@core.add_reduction_docstr("minimum", return_indices_arg="return_indices", tie_break_arg="return_indices_tie_break_left")
-def min(
-    input,
-    axis=None,
-    return_indices=False,
-    return_indices_tie_break_left=True,
-    keep_dims=False
-):
+@core.add_reduction_docstr("minimum",
+                           return_indices_arg="return_indices",
+                           tie_break_arg="return_indices_tie_break_left")
+def min(input, axis=None, return_indices=False, return_indices_tie_break_left=True, keep_dims=False):
     input = core._promote_bf16_to_f32(input)
     if return_indices:
         if return_indices_tie_break_left:
-            return core._reduce_with_indices(
-                input, axis, _argmin_combine_tie_break_left, keep_dims=keep_dims
-            )
+            return core._reduce_with_indices(input, axis, _argmin_combine_tie_break_left, keep_dims=keep_dims)
         else:
-            return core._reduce_with_indices(
-                input, axis, _argmin_combine_tie_break_fast, keep_dims=keep_dims
-            )
+            return core._reduce_with_indices(input, axis, _argmin_combine_tie_break_fast, keep_dims=keep_dims)
     else:
         if core.constexpr(input.dtype.primitive_bitwidth) < 32:
             if core.constexpr(input.dtype.is_floating()):
@@ -414,6 +398,7 @@ def _xor_combine(a, b):
 # XOR Sum
 # -----------------------------------------------------------------------------
 
+
 @core.tensor_member
 @jit
 @core.add_reduction_docstr("xor sum")
@@ -423,7 +408,7 @@ def xor_sum(input, axis=None, keep_dims=False):
 
 
 # -----------------------------------------------------------------------------
-# Or Reduction 
+# Or Reduction
 # -----------------------------------------------------------------------------
 
 
@@ -579,11 +564,11 @@ def sort_impl(
 
     Args:
         x (Tensor): The input tensor to be sorted.
-        dim (int, optional): The dimension along which to sort the tensor. 
-            If None, the tensor is sorted along the last dimension. 
+        dim (int, optional): The dimension along which to sort the tensor.
+            If None, the tensor is sorted along the last dimension.
             Currently, only sorting along the last dimension is supported.
         k (int, optional): the number of top elements to select. If none, assume k = x.shape[dim]
-        descending (bool, optional): If set to True, the tensor is sorted in descending order. 
+        descending (bool, optional): If set to True, the tensor is sorted in descending order.
             If set to False, the tensor is sorted in ascending order. Defaults to False.
     """
     # handle default dimension or check that it is the most minor dim
@@ -605,8 +590,7 @@ def sort_impl(
     # select top k elements using bitonic top-k
     # https://www.doc.ic.ac.uk/~hlgr/pdfs/MassivelyParallelTopK.pdf
     for i in core.static_range(log_k + 1, log_n + 1):
-        h = max(h, axis=(_log2(h.numel) - 1 - log_k)) if descending else min(
-            h, axis=(_log2(h.numel) - 1 - log_k))
+        h = max(h, axis=(_log2(h.numel) - 1 - log_k)) if descending else min(h, axis=(_log2(h.numel) - 1 - log_k))
         h = _bitonic_merge_hypercube(h, log_k, 2 if i < log_n else descending)
     x = core.reshape(h, x.shape[:-1] + [2**log_k])
     return x
@@ -618,12 +602,7 @@ def sort(x, dim: core.constexpr = None, descending: core.constexpr = core.CONSTE
 
 
 @jit
-def topk(
-    x,
-    k: core.constexpr,
-    dim: core.constexpr = None,
-    descending: core.constexpr = True
-):
+def topk(x, k: core.constexpr, dim: core.constexpr = None, descending: core.constexpr = True):
     """
     Returns the k largest (or smallest) elements of the input tensor along the specified dimension.
 
@@ -634,7 +613,7 @@ def topk(
         k (int): The number of top elements to return. Must be a power of two.
         dim (int, optional): The dimension along which to find the top k elements.
             If None, uses the last dimension. Currently only the last dimension is supported.
-        descending (bool, optional): If set to True, returns k largest elements. 
+        descending (bool, optional): If set to True, returns k largest elements.
             If set to False, returns k smallest elements.
 
     Example::
@@ -647,11 +626,7 @@ def topk(
 
 
 @jit
-def bitonic_merge(
-    x,
-    dim: core.constexpr = None,
-    descending: core.constexpr = core.CONSTEXPR_0
-):
+def bitonic_merge(x, dim: core.constexpr = None, descending: core.constexpr = core.CONSTEXPR_0):
     """
     Bitonic merge.
 
@@ -659,7 +634,7 @@ def bitonic_merge(
         x (Tensor): The input tensor to be merged.
         dim (int, optional): The dimension along which to merge the tensor.
             If None, uses the last dimension. Currently only the last dimension is supported.
-        descending (bool, optional): If set to True, the tensor is merged in descending order. 
+        descending (bool, optional): If set to True, the tensor is merged in descending order.
             If set to False, the tensor is merged in ascending order. Defaults to False.
     """
     # handle default dimension or check that it is the most minor dim

@@ -44,11 +44,9 @@ def run_filecheck(name: str, module_str: str, check_template: str) -> None:
             temp.write(check_template)
 
         try:
-            subprocess.check_output([
-                filecheck_path, temp_expected, "--input-file", temp_module,
-                "--dump-input-context=50"
-            ],
-                                    stderr=subprocess.STDOUT)
+            subprocess.check_output(
+                [filecheck_path, temp_expected, "--input-file", temp_module, "--dump-input-context=50"],
+                stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as error:
             decoded = error.output.decode('unicode_escape')
             raise ValueError(decoded)
@@ -67,8 +65,7 @@ def run_parser(kernel_fn, args=(), kwargs={}, target=stub_target):
     )
 
     bound_args, specialization, options = binder(*args, **kwargs)
-    options, signature, constexprs, attrs = kernel_fn._pack_args(
-        backend, kwargs, bound_args, specialization, options)
+    options, signature, constexprs, attrs = kernel_fn._pack_args(backend, kwargs, bound_args, specialization, options)
     src = ASTSource(kernel_fn, signature, constexprs, attrs)
 
     context = ir.context()
@@ -85,8 +82,7 @@ def run_filecheck_test(kernel_fn):
     assert isinstance(kernel_fn, tileon.runtime.JITFunction)
     check_template = inspect.getsource(kernel_fn.fn)
     if check_template is None:
-        raise ValueError(
-            "kernel function must have a docstring with FileCheck template")
+        raise ValueError("kernel function must have a docstring with FileCheck template")
     mlir_module = run_parser(kernel_fn)
 
     run_filecheck("placeholder", mlir_module.str_nodebug(), check_template)

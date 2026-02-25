@@ -15,17 +15,26 @@ import tileon.language.random as tl_random
 DEVICE = torch.device("cpu")
 torch.manual_seed(42)
 
-
 # ===================== GEMM =====================
+
 
 @tileon.jit
 def matmul_kernel(
-    a_ptr, b_ptr, c_ptr,
-    M, N, K,
-    stride_am, stride_ak,
-    stride_bk, stride_bn,
-    stride_cm, stride_cn,
-    BLOCK_M: tl.constexpr, BLOCK_N: tl.constexpr, BLOCK_K: tl.constexpr,
+    a_ptr,
+    b_ptr,
+    c_ptr,
+    M,
+    N,
+    K,
+    stride_am,
+    stride_ak,
+    stride_bk,
+    stride_bn,
+    stride_cm,
+    stride_cn,
+    BLOCK_M: tl.constexpr,
+    BLOCK_N: tl.constexpr,
+    BLOCK_K: tl.constexpr,
 ):
     pid_m = tl.program_id(0)
     pid_n = tl.program_id(1)
@@ -73,12 +82,21 @@ def test_gemm(M, N, K):
 
     grid = (tileon.cdiv(M, BLOCK_M), tileon.cdiv(N, BLOCK_N))
     matmul_kernel[grid](
-        a, b, c,
-        M, N, K,
-        a.stride(0), a.stride(1),
-        b.stride(0), b.stride(1),
-        c.stride(0), c.stride(1),
-        BLOCK_M=BLOCK_M, BLOCK_N=BLOCK_N, BLOCK_K=BLOCK_K,
+        a,
+        b,
+        c,
+        M,
+        N,
+        K,
+        a.stride(0),
+        a.stride(1),
+        b.stride(0),
+        b.stride(1),
+        c.stride(0),
+        c.stride(1),
+        BLOCK_M=BLOCK_M,
+        BLOCK_N=BLOCK_N,
+        BLOCK_K=BLOCK_K,
     )
     ref = torch_matmul(a, b)
     assert torch.allclose(c, ref, atol=1e-2, rtol=1e-2), \
@@ -87,9 +105,11 @@ def test_gemm(M, N, K):
 
 # ===================== Softmax =====================
 
+
 @tileon.jit
 def softmax_kernel(
-    input_ptr, output_ptr,
+    input_ptr,
+    output_ptr,
     n_cols,
     stride_row,
     BLOCK_SIZE: tl.constexpr,
@@ -115,7 +135,7 @@ def test_softmax(rows, cols):
     out = torch.empty_like(x)
 
     BLOCK_SIZE = max(32, tileon.next_power_of_2(cols))
-    softmax_kernel[(rows,)](x, out, cols, x.stride(0), BLOCK_SIZE=BLOCK_SIZE)
+    softmax_kernel[(rows, )](x, out, cols, x.stride(0), BLOCK_SIZE=BLOCK_SIZE)
 
     ref = torch.softmax(x, dim=-1)
     assert torch.allclose(out, ref, atol=1e-5, rtol=1e-5), \
@@ -130,15 +150,33 @@ def numpy_softmax(x):
 
 # ===================== FlashAttention-2 (forward) =====================
 
+
 @tileon.jit
 def flash_attention_fwd_kernel(
-    Q_ptr, K_ptr, V_ptr, O_ptr,
-    stride_qb, stride_qh, stride_qm, stride_qk,
-    stride_kb, stride_kh, stride_kn, stride_kk,
-    stride_vb, stride_vh, stride_vn, stride_vk,
-    stride_ob, stride_oh, stride_om, stride_ok,
+    Q_ptr,
+    K_ptr,
+    V_ptr,
+    O_ptr,
+    stride_qb,
+    stride_qh,
+    stride_qm,
+    stride_qk,
+    stride_kb,
+    stride_kh,
+    stride_kn,
+    stride_kk,
+    stride_vb,
+    stride_vh,
+    stride_vn,
+    stride_vk,
+    stride_ob,
+    stride_oh,
+    stride_om,
+    stride_ok,
     N_CTX,
-    BLOCK_M: tl.constexpr, BLOCK_N: tl.constexpr, D: tl.constexpr,
+    BLOCK_M: tl.constexpr,
+    BLOCK_N: tl.constexpr,
+    D: tl.constexpr,
     sm_scale,
 ):
     pid_m = tl.program_id(0)
@@ -153,8 +191,8 @@ def flash_attention_fwd_kernel(
     q = tl.load(q_ptrs, mask=q_mask, other=0.0)
 
     # Initialize accumulators
-    m_i = tl.full((BLOCK_M,), float('-inf'), dtype=tl.float32)
-    l_i = tl.zeros((BLOCK_M,), dtype=tl.float32)
+    m_i = tl.full((BLOCK_M, ), float('-inf'), dtype=tl.float32)
+    l_i = tl.zeros((BLOCK_M, ), dtype=tl.float32)
     acc = tl.zeros((BLOCK_M, D), dtype=tl.float32)
 
     # Iterate over K/V blocks
@@ -238,13 +276,30 @@ def test_flash_attention_fwd(B, H, N, D):
 
     grid = (tileon.cdiv(N, BLOCK_M), B * H)
     flash_attention_fwd_kernel[grid](
-        Q, K, V, O,
-        Q.stride(0), Q.stride(1), Q.stride(2), Q.stride(3),
-        K.stride(0), K.stride(1), K.stride(2), K.stride(3),
-        V.stride(0), V.stride(1), V.stride(2), V.stride(3),
-        O.stride(0), O.stride(1), O.stride(2), O.stride(3),
+        Q,
+        K,
+        V,
+        O,
+        Q.stride(0),
+        Q.stride(1),
+        Q.stride(2),
+        Q.stride(3),
+        K.stride(0),
+        K.stride(1),
+        K.stride(2),
+        K.stride(3),
+        V.stride(0),
+        V.stride(1),
+        V.stride(2),
+        V.stride(3),
+        O.stride(0),
+        O.stride(1),
+        O.stride(2),
+        O.stride(3),
         N,
-        BLOCK_M=BLOCK_M, BLOCK_N=BLOCK_N, D=D,
+        BLOCK_M=BLOCK_M,
+        BLOCK_N=BLOCK_N,
+        D=D,
         sm_scale=sm_scale,
     )
 
@@ -254,6 +309,7 @@ def test_flash_attention_fwd(B, H, N, D):
 
 
 # ===================== Random =====================
+
 
 @tileon.jit
 def random_kernel(
@@ -337,18 +393,30 @@ def test_randint(size):
 
 # ===================== Block-Sparse Attention =====================
 
+
 @tileon.jit
 def block_sparse_attn_kernel(
-    Q_ptr, K_ptr, V_ptr, O_ptr,
+    Q_ptr,
+    K_ptr,
+    V_ptr,
+    O_ptr,
     block_indices_ptr,  # (num_q_blocks, max_nnz) int32 indices of which K/V blocks to attend to
     num_blocks_per_row_ptr,  # (num_q_blocks,) int32 actual nnz per row
-    stride_qm, stride_qk,
-    stride_kn, stride_kk,
-    stride_vn, stride_vk,
-    stride_om, stride_ok,
-    stride_idx_row, stride_idx_col,
-    N_CTX, max_nnz,
-    BLOCK_M: tl.constexpr, BLOCK_N: tl.constexpr, D: tl.constexpr,
+    stride_qm,
+    stride_qk,
+    stride_kn,
+    stride_kk,
+    stride_vn,
+    stride_vk,
+    stride_om,
+    stride_ok,
+    stride_idx_row,
+    stride_idx_col,
+    N_CTX,
+    max_nnz,
+    BLOCK_M: tl.constexpr,
+    BLOCK_N: tl.constexpr,
+    D: tl.constexpr,
     sm_scale,
 ):
     pid_m = tl.program_id(0)
@@ -363,8 +431,8 @@ def block_sparse_attn_kernel(
     # How many K/V blocks this Q block attends to
     nnz = tl.load(num_blocks_per_row_ptr + pid_m)
 
-    m_i = tl.full((BLOCK_M,), float('-inf'), dtype=tl.float32)
-    l_i = tl.zeros((BLOCK_M,), dtype=tl.float32)
+    m_i = tl.full((BLOCK_M, ), float('-inf'), dtype=tl.float32)
+    l_i = tl.zeros((BLOCK_M, ), dtype=tl.float32)
     acc = tl.zeros((BLOCK_M, D), dtype=tl.float32)
 
     for idx in range(max_nnz):
@@ -480,6 +548,7 @@ def numpy_block_sparse_attention(Q, K, V, block_indices, num_blocks_per_row, BLO
 
     return O
 
+
 def test_block_sparse_attention(N, D, sparsity):
     BLOCK_M = 32
     BLOCK_N = 32
@@ -504,17 +573,29 @@ def test_block_sparse_attention(N, D, sparsity):
         block_indices[qb, :nnz] = chosen.to(torch.int32)
         num_blocks_per_row[qb] = nnz
 
-    grid = (num_q_blocks,)
+    grid = (num_q_blocks, )
     block_sparse_attn_kernel[grid](
-        Q, K, V, O,
-        block_indices, num_blocks_per_row,
-        Q.stride(0), Q.stride(1),
-        K.stride(0), K.stride(1),
-        V.stride(0), V.stride(1),
-        O.stride(0), O.stride(1),
-        block_indices.stride(0), block_indices.stride(1),
-        N, max_nnz,
-        BLOCK_M=BLOCK_M, BLOCK_N=BLOCK_N, D=D,
+        Q,
+        K,
+        V,
+        O,
+        block_indices,
+        num_blocks_per_row,
+        Q.stride(0),
+        Q.stride(1),
+        K.stride(0),
+        K.stride(1),
+        V.stride(0),
+        V.stride(1),
+        O.stride(0),
+        O.stride(1),
+        block_indices.stride(0),
+        block_indices.stride(1),
+        N,
+        max_nnz,
+        BLOCK_M=BLOCK_M,
+        BLOCK_N=BLOCK_N,
+        D=D,
         sm_scale=sm_scale,
     )
 
@@ -535,8 +616,7 @@ def test_block_sparse_attention(N, D, sparsity):
         ylabel='GFLOPS',
         plot_name='gemm-performance',
         args={},
-    )
-)
+    ))
 def benchmark_gemm(size, provider):
     M = N = K = size
     a = torch.rand(M, K, device=DEVICE, dtype=torch.float32)
@@ -551,21 +631,40 @@ def benchmark_gemm(size, provider):
     if provider == 'tileon':
         grid = (tileon.cdiv(M, BLOCK_M), tileon.cdiv(N, BLOCK_N))
         matmul_kernel[grid](
-            a, b, c,
-            M, N, K,
-            a.stride(0), a.stride(1),
-            b.stride(0), b.stride(1),
-            c.stride(0), c.stride(1),
-            BLOCK_M=BLOCK_M, BLOCK_N=BLOCK_N, BLOCK_K=BLOCK_K,
+            a,
+            b,
+            c,
+            M,
+            N,
+            K,
+            a.stride(0),
+            a.stride(1),
+            b.stride(0),
+            b.stride(1),
+            c.stride(0),
+            c.stride(1),
+            BLOCK_M=BLOCK_M,
+            BLOCK_N=BLOCK_N,
+            BLOCK_K=BLOCK_K,
         )
         ms, min_ms, max_ms = tileon.testing.do_bench(lambda: matmul_kernel[grid](
-            a, b, c,
-            M, N, K,
-            a.stride(0), a.stride(1),
-            b.stride(0), b.stride(1),
-            c.stride(0), c.stride(1),
-            BLOCK_M=BLOCK_M, BLOCK_N=BLOCK_N, BLOCK_K=BLOCK_K,
-        ), quantiles=quantiles)
+            a,
+            b,
+            c,
+            M,
+            N,
+            K,
+            a.stride(0),
+            a.stride(1),
+            b.stride(0),
+            b.stride(1),
+            c.stride(0),
+            c.stride(1),
+            BLOCK_M=BLOCK_M,
+            BLOCK_N=BLOCK_N,
+            BLOCK_K=BLOCK_K,
+        ),
+                                                     quantiles=quantiles)
     if provider == 'numpy':
         a_np = a.cpu().numpy()
         b_np = b.cpu().numpy()
@@ -588,8 +687,7 @@ def benchmark_gemm(size, provider):
         ylabel='GB/s',
         plot_name='softmax-performance',
         args={},
-    )
-)
+    ))
 def benchmark_softmax(cols, provider):
     rows = 8
     x = torch.rand(rows, cols, device=DEVICE, dtype=torch.float32)
@@ -600,7 +698,9 @@ def benchmark_softmax(cols, provider):
     if provider == 'torch':
         ms, min_ms, max_ms = tileon.testing.do_bench(lambda: torch.softmax(x, dim=-1), quantiles=quantiles)
     if provider == 'tileon':
-        ms, min_ms, max_ms = tileon.testing.do_bench(lambda: softmax_kernel[(rows,)](x, out, cols, x.stride(0), BLOCK_SIZE=BLOCK_SIZE), quantiles=quantiles)
+        ms, min_ms, max_ms = tileon.testing.do_bench(lambda: softmax_kernel[(rows, )]
+                                                     (x, out, cols, x.stride(0), BLOCK_SIZE=BLOCK_SIZE),
+                                                     quantiles=quantiles)
     if provider == 'numpy':
         x_np = x.cpu().numpy()
         ms, min_ms, max_ms = tileon.testing.do_bench(lambda: numpy_softmax(x_np), quantiles=quantiles)
@@ -621,8 +721,7 @@ def benchmark_softmax(cols, provider):
         ylabel='GB/s',
         plot_name='flash-attention-performance',
         args={},
-    )
-)
+    ))
 def benchmark_flash_attention(size, provider):
     N = size
     B = 1
@@ -641,23 +740,43 @@ def benchmark_flash_attention(size, provider):
 
     quantiles = [0.5, 0.2, 0.8]
     if provider == 'torch':
-        ms, min_ms, max_ms = tileon.testing.do_bench(lambda: torch_flash_attention(Q, K, V, sm_scale), quantiles=quantiles)
+        ms, min_ms, max_ms = tileon.testing.do_bench(lambda: torch_flash_attention(Q, K, V, sm_scale),
+                                                     quantiles=quantiles)
     if provider == 'tileon':
         ms, min_ms, max_ms = tileon.testing.do_bench(lambda: flash_attention_fwd_kernel[grid](
-            Q, K, V, O,
-            Q.stride(0), Q.stride(1), Q.stride(2), Q.stride(3),
-            K.stride(0), K.stride(1), K.stride(2), K.stride(3),
-            V.stride(0), V.stride(1), V.stride(2), V.stride(3),
-            O.stride(0), O.stride(1), O.stride(2), O.stride(3),
+            Q,
+            K,
+            V,
+            O,
+            Q.stride(0),
+            Q.stride(1),
+            Q.stride(2),
+            Q.stride(3),
+            K.stride(0),
+            K.stride(1),
+            K.stride(2),
+            K.stride(3),
+            V.stride(0),
+            V.stride(1),
+            V.stride(2),
+            V.stride(3),
+            O.stride(0),
+            O.stride(1),
+            O.stride(2),
+            O.stride(3),
             N,
-            BLOCK_M=BLOCK_M, BLOCK_N=BLOCK_N, D=D,
+            BLOCK_M=BLOCK_M,
+            BLOCK_N=BLOCK_N,
+            D=D,
             sm_scale=sm_scale,
-        ), quantiles=quantiles)
+        ),
+                                                     quantiles=quantiles)
     if provider == 'numpy':
         Q_np = Q.cpu().numpy()
         K_np = K.cpu().numpy()
         V_np = V.cpu().numpy()
-        ms, min_ms, max_ms = tileon.testing.do_bench(lambda: numpy_flash_attention(Q_np, K_np, V_np, sm_scale), quantiles=quantiles)
+        ms, min_ms, max_ms = tileon.testing.do_bench(lambda: numpy_flash_attention(Q_np, K_np, V_np, sm_scale),
+                                                     quantiles=quantiles)
 
     gbps = lambda ms: 4 * B * H * N * N * D * 1e-9 / (ms * 1e-3)
     return gbps(ms), gbps(max_ms), gbps(min_ms)
@@ -675,8 +794,7 @@ def benchmark_flash_attention(size, provider):
         ylabel='GB/s',
         plot_name='block-sparse-attention-performance',
         args={},
-    )
-)
+    ))
 def benchmark_block_sparse_attention(size, provider):
     N = size
     D = 32
@@ -702,40 +820,48 @@ def benchmark_block_sparse_attention(size, provider):
         block_indices[qb, :nnz] = chosen.to(torch.int32)
         num_blocks_per_row[qb] = nnz
 
-    grid = (num_q_blocks,)
+    grid = (num_q_blocks, )
 
     quantiles = [0.5, 0.2, 0.8]
     if provider == 'torch':
-        ms, min_ms, max_ms = tileon.testing.do_bench(
-            lambda: torch_block_sparse_attention(Q, K, V, block_indices, num_blocks_per_row, BLOCK_M, BLOCK_N, sm_scale),
-            quantiles=quantiles
-        )
+        ms, min_ms, max_ms = tileon.testing.do_bench(lambda: torch_block_sparse_attention(
+            Q, K, V, block_indices, num_blocks_per_row, BLOCK_M, BLOCK_N, sm_scale),
+                                                     quantiles=quantiles)
     if provider == 'tileon':
-        ms, min_ms, max_ms = tileon.testing.do_bench(
-            lambda: block_sparse_attn_kernel[grid](
-                Q, K, V, O,
-                block_indices, num_blocks_per_row,
-                Q.stride(0), Q.stride(1),
-                K.stride(0), K.stride(1),
-                V.stride(0), V.stride(1),
-                O.stride(0), O.stride(1),
-                block_indices.stride(0), block_indices.stride(1),
-                N, max_nnz,
-                BLOCK_M=BLOCK_M, BLOCK_N=BLOCK_N, D=D,
-                sm_scale=sm_scale,
-            ),
-            quantiles=quantiles
-        )
+        ms, min_ms, max_ms = tileon.testing.do_bench(lambda: block_sparse_attn_kernel[grid](
+            Q,
+            K,
+            V,
+            O,
+            block_indices,
+            num_blocks_per_row,
+            Q.stride(0),
+            Q.stride(1),
+            K.stride(0),
+            K.stride(1),
+            V.stride(0),
+            V.stride(1),
+            O.stride(0),
+            O.stride(1),
+            block_indices.stride(0),
+            block_indices.stride(1),
+            N,
+            max_nnz,
+            BLOCK_M=BLOCK_M,
+            BLOCK_N=BLOCK_N,
+            D=D,
+            sm_scale=sm_scale,
+        ),
+                                                     quantiles=quantiles)
     if provider == 'numpy':
         Q_np = Q.cpu().numpy()
         K_np = K.cpu().numpy()
         V_np = V.cpu().numpy()
         block_indices_np = block_indices.cpu().numpy()
         num_blocks_per_row_np = num_blocks_per_row.cpu().numpy()
-        ms, min_ms, max_ms = tileon.testing.do_bench(
-            lambda: numpy_block_sparse_attention(Q_np, K_np, V_np, block_indices_np, num_blocks_per_row_np, BLOCK_M, BLOCK_N, sm_scale),
-            quantiles=quantiles
-        )
+        ms, min_ms, max_ms = tileon.testing.do_bench(lambda: numpy_block_sparse_attention(
+            Q_np, K_np, V_np, block_indices_np, num_blocks_per_row_np, BLOCK_M, BLOCK_N, sm_scale),
+                                                     quantiles=quantiles)
 
     gbps = lambda ms: 4 * N * N * D * (1 - sparsity) * 1e-9 / (ms * 1e-3)
     return gbps(ms), gbps(max_ms), gbps(min_ms)
@@ -753,8 +879,7 @@ def benchmark_block_sparse_attention(size, provider):
         ylabel='GB/s',
         plot_name='rand-performance',
         args={},
-    )
-)
+    ))
 def benchmark_random(size, provider):
     output = torch.empty(size, device=DEVICE, dtype=torch.float32)
     seed = 42
@@ -765,7 +890,9 @@ def benchmark_random(size, provider):
     if provider == 'torch':
         ms, min_ms, max_ms = tileon.testing.do_bench(lambda: torch.rand(size, device=DEVICE), quantiles=quantiles)
     if provider == 'tileon':
-        ms, min_ms, max_ms = tileon.testing.do_bench(lambda: random_kernel[grid](output, size, seed=seed, BLOCK_SIZE=BLOCK_SIZE), quantiles=quantiles)
+        ms, min_ms, max_ms = tileon.testing.do_bench(lambda: random_kernel[grid]
+                                                     (output, size, seed=seed, BLOCK_SIZE=BLOCK_SIZE),
+                                                     quantiles=quantiles)
     if provider == 'numpy':
         ms, min_ms, max_ms = tileon.testing.do_bench(lambda: np.random.rand(size), quantiles=quantiles)
 
@@ -785,8 +912,7 @@ def benchmark_random(size, provider):
         ylabel='GB/s',
         plot_name='randn-performance',
         args={},
-    )
-)
+    ))
 def benchmark_randn(size, provider):
     output = torch.empty(size, device=DEVICE, dtype=torch.float32)
     seed = 42
@@ -797,7 +923,9 @@ def benchmark_randn(size, provider):
     if provider == 'torch':
         ms, min_ms, max_ms = tileon.testing.do_bench(lambda: torch.randn(size, device=DEVICE), quantiles=quantiles)
     if provider == 'tileon':
-        ms, min_ms, max_ms = tileon.testing.do_bench(lambda: randn_kernel[grid](output, size, seed=seed, BLOCK_SIZE=BLOCK_SIZE), quantiles=quantiles)
+        ms, min_ms, max_ms = tileon.testing.do_bench(lambda: randn_kernel[grid]
+                                                     (output, size, seed=seed, BLOCK_SIZE=BLOCK_SIZE),
+                                                     quantiles=quantiles)
     if provider == 'numpy':
         ms, min_ms, max_ms = tileon.testing.do_bench(lambda: np.random.randn(size), quantiles=quantiles)
 
@@ -817,8 +945,7 @@ def benchmark_randn(size, provider):
         ylabel='GB/s',
         plot_name='randint-performance',
         args={},
-    )
-)
+    ))
 def benchmark_randint(size, provider):
     output = torch.empty(size, device=DEVICE, dtype=torch.int32)
     seed = 42
@@ -827,11 +954,15 @@ def benchmark_randint(size, provider):
 
     quantiles = [0.5, 0.2, 0.8]
     if provider == 'torch':
-        ms, min_ms, max_ms = tileon.testing.do_bench(lambda: torch.randint(0, 2**31, (size,), device=DEVICE, dtype=torch.int32), quantiles=quantiles)
+        ms, min_ms, max_ms = tileon.testing.do_bench(
+            lambda: torch.randint(0, 2**31, (size, ), device=DEVICE, dtype=torch.int32), quantiles=quantiles)
     if provider == 'tileon':
-        ms, min_ms, max_ms = tileon.testing.do_bench(lambda: randint_kernel[grid](output, size, seed=seed, BLOCK_SIZE=BLOCK_SIZE), quantiles=quantiles)
+        ms, min_ms, max_ms = tileon.testing.do_bench(lambda: randint_kernel[grid]
+                                                     (output, size, seed=seed, BLOCK_SIZE=BLOCK_SIZE),
+                                                     quantiles=quantiles)
     if provider == 'numpy':
-        ms, min_ms, max_ms = tileon.testing.do_bench(lambda: np.random.randint(0, 2**31, size, dtype=np.int32), quantiles=quantiles)
+        ms, min_ms, max_ms = tileon.testing.do_bench(lambda: np.random.randint(0, 2**31, size, dtype=np.int32),
+                                                     quantiles=quantiles)
 
     gbps = lambda ms: size * 4 * 1e-9 / (ms * 1e-3)
     return gbps(ms), gbps(max_ms), gbps(min_ms)
@@ -840,8 +971,11 @@ def benchmark_randint(size, provider):
 if __name__ == "__main__":
     benchmark_gemm.run(print_data=True, save_path=os.path.join(os.path.dirname(__file__), 'figures', 'gemm'))
     benchmark_softmax.run(print_data=True, save_path=os.path.join(os.path.dirname(__file__), 'figures', 'softmax'))
-    benchmark_flash_attention.run(print_data=True, save_path=os.path.join(os.path.dirname(__file__), 'figures', 'flash-attention'))
-    benchmark_block_sparse_attention.run(print_data=True, save_path=os.path.join(os.path.dirname(__file__), 'figures', 'block-sparse-attention'))
+    benchmark_flash_attention.run(print_data=True,
+                                  save_path=os.path.join(os.path.dirname(__file__), 'figures', 'flash-attention'))
+    benchmark_block_sparse_attention.run(print_data=True,
+                                         save_path=os.path.join(os.path.dirname(__file__), 'figures',
+                                                                'block-sparse-attention'))
     benchmark_random.run(print_data=True, save_path=os.path.join(os.path.dirname(__file__), 'figures', 'random'))
     benchmark_randn.run(print_data=True, save_path=os.path.join(os.path.dirname(__file__), 'figures', 'randn'))
     benchmark_randint.run(print_data=True, save_path=os.path.join(os.path.dirname(__file__), 'figures', 'randint'))

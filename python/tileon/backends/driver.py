@@ -4,12 +4,7 @@ from typing import Callable, List, Protocol, Sequence
 
 class Benchmarker(Protocol):
 
-    def __call__(
-        self, kernel_call: Callable,
-        *,
-        quantiles: List[float],
-        **kwargs
-    ) -> Sequence[float]:
+    def __call__(self, kernel_call: Callable, *, quantiles: List[float], **kwargs) -> Sequence[float]:
         ...
 
 

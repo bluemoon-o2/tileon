@@ -8,7 +8,7 @@ on:
       - "docs/**"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-docs:
@@ -27,7 +27,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r docs/requirements.txt
 
-      - name: Build docs
+      - name: Deploy docs
         run: |
-          cd docs
-          sphinx-build -M html . _build -W
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          mkdocs gh-deploy --force

@@ -22,9 +22,7 @@ def _check_dtype(dtypes: List[str]) -> T:
             all_args = list(args) + list(kwargs.values())
             for arg in [a for a in all_args if isinstance(a, core.tensor)]:
                 if arg.type.scalar.name not in dtypes:
-                    raise ValueError(
-                        f"Expected dtype {dtypes} but got {arg.type.scalar.name}"
-                    )
+                    raise ValueError(f"Expected dtype {dtypes} but got {arg.type.scalar.name}")
             return fn(*args, **kwargs)
 
         return check
@@ -158,8 +156,7 @@ def sqrt(x, _semantic=None):
 
 @core.builtin
 @_check_dtype(dtypes=["fp32"])
-@_add_math_1arg_docstr(
-    "precise square root (rounding to nearest wrt the IEEE standard)")
+@_add_math_1arg_docstr("precise square root (rounding to nearest wrt the IEEE standard)")
 @core.tensor_member
 def sqrt_rn(x, _semantic=None):
     x = _semantic.to_tensor(x)
@@ -210,8 +207,7 @@ def div_rn(x, y, _semantic=None):
     x = _semantic.to_tensor(x)
     y = _semantic.to_tensor(y)
     x, y = core.binary_op_type_legalization(x, y, _semantic)
-    return core.tensor(
-        _semantic.builder.create_precise_divf(x.handle, y.handle), x.type)
+    return core.tensor(_semantic.builder.create_precise_divf(x.handle, y.handle), x.type)
 
 
 @core.builtin

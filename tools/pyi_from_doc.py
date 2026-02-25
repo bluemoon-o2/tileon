@@ -6,8 +6,7 @@ from pathlib import Path
 
 
 def _load_docs(module_path: Path) -> list[dict]:
-    spec = importlib.util.spec_from_file_location("tileon_pyi_docs",
-                                                  module_path)
+    spec = importlib.util.spec_from_file_location("tileon_pyi_docs", module_path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Unable to load module from {module_path}")
     module = importlib.util.module_from_spec(spec)
@@ -41,8 +40,7 @@ def _parse_signature(signature: str) -> tuple[list[tuple[str, str]], str]:
     return params, return_type
 
 
-def _render_docstring(entry: dict, param_order: list[tuple[str, str]],
-                      return_type: str) -> list[str]:
+def _render_docstring(entry: dict, param_order: list[tuple[str, str]], return_type: str) -> list[str]:
     lines: list[str] = []
     summary = entry.get("summary") or entry.get("doc")
     if summary:

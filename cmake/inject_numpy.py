@@ -14,7 +14,7 @@ for p in files:
         lines = open(p, encoding='utf-8').readlines()
     except Exception:
         continue
-        
+
     content = ''.join(lines)
 
     if "numpy" in content:
@@ -23,7 +23,7 @@ for p in files:
             if line.strip().startswith('"""') and i > 0:
                 insert_idx = i + 1
                 break
-        
+
         header = 'try:\n    import numpy\nexcept ImportError:\n    numpy = None\n'
         if header not in content:
             lines.insert(insert_idx, header)

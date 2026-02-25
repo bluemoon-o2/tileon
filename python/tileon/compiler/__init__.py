@@ -1,5 +1,3 @@
 from .errors import CompilationError
 
-__all__ = [
-    "CompilationError"
-]
+__all__ = ["CompilationError"]

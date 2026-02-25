@@ -8,17 +8,16 @@ import inspect
 import itertools
 import threading
 import textwrap
-from dataclasses import dataclass
 from types import ModuleType
-from typing import Callable, Generic, Iterable, Optional, TypeAlias, TypeVar, overload, Dict, Any, Tuple, Union
+from typing import Callable, Generic, Iterable, Optional, TypeAlias, TypeVar, overload, Dict, Any, Tuple, Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import torch
 
 from .. import knobs
 from ..backends import BaseBackend
-from . import _async_compile
 from .._utils import is_namedtuple
-from .._utils import find_paths_if, get_iterable_path, is_namedtuple
-from .cache import get_cache_key
-from tileon._C import get_cache_invalidating_env_vars, native_specialize_impl, ir
+from tileon._C import native_specialize_impl
 
 TILEON_MODULE = "tileon.language"
 FUNC_DEF_PATTERN = re.compile(r"^def\s+\w+\s*\(", re.MULTILINE)
@@ -262,6 +261,7 @@ def get_jit_fn_file_line(fn):
             break
     return file_name, begin_line
 
+
 # -----------------------------------------------------------------------------
 # JIT-Compiling
 # -----------------------------------------------------------------------------
@@ -281,10 +281,7 @@ class KernelInterface(Generic[T]):
             grid: Grid configuration for kernel launch
             **kwargs: Additional keyword arguments for kernel execution
         """
-        return self.run(*map(MockTensor.from_torch, tensors),
-                        grid=grid,
-                        warmup=True,
-                        **kwargs)
+        return self.run(*map(MockTensor.from_torch, tensors), grid=grid, warmup=True, **kwargs)
 
     def run(self, *tensors, grid: GridShape, warmup: bool = False, **kwargs):
         """
@@ -308,8 +305,7 @@ class KernelInterface(Generic[T]):
         Returns:
             A callable proxy that executes the kernel with the given grid configuration.
         """
-        return lambda *tensors, **kwargs: self.run(
-            *tensors, grid=grid, warmup=False, **kwargs)
+        return lambda *tensors, **kwargs: self.run(*tensors, grid=grid, warmup=False, **kwargs)
 
 
 class DependenciesFinder(ast.NodeVisitor):
@@ -322,8 +318,7 @@ class DependenciesFinder(ast.NodeVisitor):
     visitor. If not, we raise an error.
     """
 
-    def __init__(self, name: str, src: str, globals: Dict[str, Any],
-                 nonlocals: Dict[str, Any]):
+    def __init__(self, name: str, src: str, globals: Dict[str, Any], nonlocals: Dict[str, Any]):
         """Initialize the DependenciesFinder.
 
         Args:
@@ -338,8 +333,7 @@ class DependenciesFinder(ast.NodeVisitor):
 
         self.globals = globals
         self.nonlocals = nonlocals
-        self.used_global_vals: Dict[Tuple[str, int],
-                                    Tuple[Any, Dict[str, Any]]] = {}
+        self.used_global_vals: Dict[Tuple[str, int], Tuple[Any, Dict[str, Any]]] = {}
         self.visiting_arg_default_value = False
 
         self.supported_python_builtins = {
@@ -355,7 +349,7 @@ class DependenciesFinder(ast.NodeVisitor):
             'isinstance',
         }
         self.supported_modules = {
-            TRITON_MODULE,
+            TILEON_MODULE,
             "copy",
             "math",
         }
@@ -393,18 +387,15 @@ class DependenciesFinder(ast.NodeVisitor):
         Raises:
             RuntimeError: If there's a conflicting value for a global variable.
         """
-        assert isinstance(
-            func, JITCallable), f"func must be a JITCallable, got {type(func)}"
+        assert isinstance(func, JITCallable), f"func must be a JITCallable, got {type(func)}"
         for k in self.used_global_vals.keys() & func.used_global_vals.keys():
             var_name, _ = k
             v1, _ = self.used_global_vals[k]
             v2, _ = func.used_global_vals[k]
             if v1 != v2:
-                raise RuntimeError(
-                    f"Global variable {var_name} has value {v1} when compiling "
-                    f"{self.name}, but inner kernel {func.__name__} has conflicting "
-                    f"value {v2} from when it was first compiled.  This is not allowed."
-                )
+                raise RuntimeError(f"Global variable {var_name} has value {v1} when compiling "
+                                   f"{self.name}, but inner kernel {func.__name__} has conflicting "
+                                   f"value {v2} from when it was first compiled.  This is not allowed.")
         self.used_global_vals.update(func.used_global_vals)
         func_key = func.cache_key
         func_key += str(getattr(func, "noinline", False))
@@ -441,13 +432,11 @@ class DependenciesFinder(ast.NodeVisitor):
             self._update_hash(val)
             return
 
-        if callable(val) and not isinstance(val, type) and not isinstance(
-                val, constexpr):
+        if callable(val) and not isinstance(val, type) and not isinstance(val, constexpr):
             raise RuntimeError(f"Unsupported function referenced: {val}")
 
         if var_dict is not None:
-            self.used_global_vals[(name, id(var_dict))] = (copy.deepcopy(val),
-                                                           var_dict)
+            self.used_global_vals[(name, id(var_dict))] = (copy.deepcopy(val), var_dict)
         return
 
     def visit_Name(self, node):
@@ -538,9 +527,7 @@ class DependenciesFinder(ast.NodeVisitor):
             finally:
                 self.visiting_arg_default_value = False
 
-        for arg in itertools.chain(node.posonlyargs, node.args,
-                                   [node.vararg] if node.vararg else [],
-                                   node.kwonlyargs):
+        for arg in itertools.chain(node.posonlyargs, node.args, [node.vararg] if node.vararg else [], node.kwonlyargs):
             self.visit(arg)
 
         visit_defaults(node.kw_defaults)
@@ -572,8 +559,7 @@ class DependenciesFinder(ast.NodeVisitor):
             TypeError: If simultaneous multiple assignment is used.
         """
         if len(node.targets) != 1:
-            raise TypeError(
-                "Simultaneous multiple assignment is not supported.")
+            raise TypeError("Simultaneous multiple assignment is not supported.")
 
         self.visitAssnTarget(node.targets[0])
         self.generic_visit(node)
@@ -629,8 +615,7 @@ class JITCallable:
         try:
             self.raw_src, self.first_line_number = inspect.getsourcelines(fn)
         except OSError as e:
-            raise ValueError(
-                "@jit functions should be defined in a Python file") from e
+            raise ValueError("@jit functions should be defined in a Python file") from e
 
         src = textwrap.dedent("".join(self.raw_src))
         self._src = src[FUNC_DEF_PATTERN.search(src).start():]
@@ -638,8 +623,7 @@ class JITCallable:
         self.hash = None
         self._hash_lock = threading.RLock()
 
-        self.used_global_vals: Dict[Tuple[str, int],
-                                    Tuple[Any, Dict[str, Any]]] = {}
+        self.used_global_vals: Dict[Tuple[str, int], Tuple[Any, Dict[str, Any]]] = {}
 
     def _unsafe_update_src(self, new_src):
         """Update the source code.
@@ -665,10 +649,8 @@ class JITCallable:
         Raises:
             AttributeError: Always raised to prevent direct setting.
         """
-        raise AttributeError(
-            "Cannot set attribute 'src' directly. "
-            "Use '_unsafe_update_src()' and manually clear `.hash` of all callers instead."
-        )
+        raise AttributeError("Cannot set attribute 'src' directly. "
+                             "Use '_unsafe_update_src()' and manually clear `.hash` of all callers instead.")
 
     def _get_src(self):
         """Get the source code.
@@ -702,14 +684,9 @@ class JITCallable:
             AssertionError: If the AST does not contain exactly one function definition.
         """
         tree = ast.parse(self._src)
-        assert isinstance(tree,
-                          ast.Module), f"Expected Module, got {type(tree)}"
-        assert len(
-            tree.body
-        ) == 1, f"Expected 1 function definition, got {len(tree.body)}"
-        assert isinstance(
-            tree.body[0],
-            ast.FunctionDef), f"Expected FunctionDef, got {type(tree.body[0])}"
+        assert isinstance(tree, ast.Module), f"Expected Module, got {type(tree)}"
+        assert len(tree.body) == 1, f"Expected 1 function definition, got {len(tree.body)}"
+        assert isinstance(tree.body[0], ast.FunctionDef), f"Expected FunctionDef, got {type(tree.body[0])}"
         return tree
 
     def get_capture_scope(self):
@@ -721,10 +698,7 @@ class JITCallable:
         fn = self.fn
         if fn.__closure__ is None:
             return self.__globals__
-        nonlocals = {
-            name: cell.cell_contents
-            for name, cell in zip(fn.__code__.co_freevars, fn.__closure__)
-        }
+        nonlocals = {name: cell.cell_contents for name, cell in zip(fn.__code__.co_freevars, fn.__closure__)}
         return self.__globals__ | nonlocals
 
     @property
@@ -757,15 +731,11 @@ class JITCallable:
 
             # hash the dependencies, line number, and constexpr values
             self.hash = dependencies_finder.ret + str(self.first_line_number)
-            self.used_global_vals = dict(
-                sorted(dependencies_finder.used_global_vals.items()))
+            self.used_global_vals = dict(sorted(dependencies_finder.used_global_vals.items()))
 
             from tileon.language.core import constexpr
-            self.hash += str([
-                (name, val)
-                for (name, _), (val, _) in self.used_global_vals.items()
-                if isinstance(val, constexpr)
-            ])
+            self.hash += str([(name, val) for (name, _), (val, _) in self.used_global_vals.items()
+                              if isinstance(val, constexpr)])
 
             self.hash = hashlib.sha256(self.hash.encode("utf-8")).hexdigest()
         return self.hash
@@ -787,8 +757,7 @@ class JITCallable:
         Raises:
             NotImplementedError: Always raised as this method is not implemented.
         """
-        raise NotImplementedError(
-            "JITCallable._flatten_ir() is not implemented")
+        raise NotImplementedError("JITCallable._flatten_ir() is not implemented")
 
 
 class BoundConstexprFunction(JITCallable):
@@ -885,7 +854,7 @@ def constexpr_function(fn):
 
 
 @overload
-def jit(fn: T) -> JITFunction[T]:
+def jit(fn: T) -> KernelInterface[T]:
     ...
 
 
@@ -899,7 +868,7 @@ def jit(
     do_not_specialize_on_alignment: Optional[Iterable[int | str]] = None,
     debug: Optional[bool] = None,
     noinline: Optional[bool] = None,
-) -> Callable[[T], JITFunction[T]]:
+) -> Callable[[T], KernelInterface[T]]:
     ...
 
 
@@ -938,16 +907,14 @@ def jit(
         assert callable(fn), "jit decorator must be called on a callable object"
         if knobs.runtime.interpret:
             from .interpreter import InterpretedFunction
-            return InterpretedFunction(
-                fn,
-                version=version,
-                do_not_specialize=do_not_specialize,
-                do_not_specialize_on_alignment=do_not_specialize_on_alignment,
-                debug=debug,
-                noinline=noinline,
-                repr=repr,
-                launch_metadata=launch_metadata
-            )
+            return InterpretedFunction(fn,
+                                       version=version,
+                                       do_not_specialize=do_not_specialize,
+                                       do_not_specialize_on_alignment=do_not_specialize_on_alignment,
+                                       debug=debug,
+                                       noinline=noinline,
+                                       repr=repr,
+                                       launch_metadata=launch_metadata)
 
     if fn is not None:
         return decorator(fn)

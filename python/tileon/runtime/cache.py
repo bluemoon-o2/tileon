@@ -190,11 +190,7 @@ class RedisRemoteCacheBackend(RemoteCacheBackend):
 
     def get(self, filenames: List[str]) -> Dict[str, str]:
         results = self._redis.mget([self._get_key(f) for f in filenames])
-        return {
-            filename: result
-            for filename, result in zip(filenames, results)
-            if result is not None
-        }
+        return {filename: result for filename, result in zip(filenames, results) if result is not None}
 
     def put(self, filename: str, data: bytes) -> Dict[str, bytes]:
         self._redis.set(self._get_key(filename), data)
@@ -215,8 +211,7 @@ class RemoteCacheManager(CacheManager):
         remote_cache_cls = knobs.cache.remote_manager_class
         if not remote_cache_cls:
             raise RuntimeError(
-                "Unable to instantiate RemoteCacheManager, TRITON_REMOTE_CACHE_BACKEND doesn't point to a valid class"
-            )
+                "Unable to instantiate RemoteCacheManager, TRITON_REMOTE_CACHE_BACKEND doesn't point to a valid class")
         self._backend = remote_cache_cls(key)
 
         self._override = override

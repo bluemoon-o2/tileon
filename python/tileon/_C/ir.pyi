@@ -7,27 +7,27 @@ __all__: list[str] = ['ATOMIC_OP', 'CACHE_MODIFIER', 'DESCRIPTOR_REDUCE_KIND', '
 class ATOMIC_OP:
     """
     Atomic operation enumeration class: specifies the type of atomic operation
-    
+
     Members:
-    
+
       AND : AND operation
-    
+
       OR : OR operation
-    
+
       XOR : XOR operation
-    
+
       ADD : ADD operation
-    
+
       FADD : FADD operation
-    
+
       MAX : MAX operation
-    
+
       MIN : MIN operation
-    
+
       UMAX : UMAX operation
-    
+
       UMIN : UMIN operation
-    
+
       XCHG : XCHG operation
     """
     ADD: typing.ClassVar[ATOMIC_OP]  # value = <ATOMIC_OP.ADD: 0>
@@ -78,21 +78,21 @@ class ATOMIC_OP:
 class CACHE_MODIFIER:
     """
     Cache modifier enumeration class: specifies the cache behavior of a tensor/array
-    
+
     Members:
-    
+
       NONE : No cache modifier
-    
+
       CA : Cache all
-    
+
       CG : Cache global
-    
+
       WB : Write back
-    
+
       CS : Cache set
-    
+
       WT : Write through
-    
+
       CV : Cache validate
     """
     CA: typing.ClassVar[CACHE_MODIFIER]  # value = <CACHE_MODIFIER.CA: 1>
@@ -140,23 +140,23 @@ class CACHE_MODIFIER:
 class DESCRIPTOR_REDUCE_KIND:
     """
     Descriptor reduce kind enumeration class: specifies the reduce operation for a descriptor
-    
+
     Members:
-    
+
       ADD : Add reduce kind
-    
+
       MIN : Min reduce kind
-    
+
       MAX : Max reduce kind
-    
+
       INC : Increment reduce kind
-    
+
       DEC : Decrement reduce kind
-    
+
       AND : AND reduce kind
-    
+
       OR : OR reduce kind
-    
+
       XOR : XOR reduce kind
     """
     ADD: typing.ClassVar[DESCRIPTOR_REDUCE_KIND]  # value = <DESCRIPTOR_REDUCE_KIND.ADD: 0>
@@ -205,13 +205,13 @@ class DESCRIPTOR_REDUCE_KIND:
 class EVICTION_POLICY:
     """
     Eviction policy enumeration class: specifies the policy of evicting a tensor/array from cache
-    
+
     Members:
-    
+
       NORMAL : Normal eviction policy
-    
+
       EVICT_FIRST : Evict first eviction policy
-    
+
       EVICT_LAST : Evict last eviction policy
     """
     EVICT_FIRST: typing.ClassVar[EVICTION_POLICY]  # value = <EVICTION_POLICY.EVICT_FIRST: 1>
@@ -255,17 +255,17 @@ class EVICTION_POLICY:
 class INPUT_PRECISION:
     """
     Input precision enumeration class: specifies the precision of input data
-    
+
     Members:
-    
+
       TF32 : TF32 precision
-    
+
       TF32x3 : TF32x3 precision
-    
+
       IEEE : IEEE precision
-    
+
       BF16x3 : BF16x3 precision
-    
+
       BF16x6 : BF16x6 precision
     """
     BF16x3: typing.ClassVar[INPUT_PRECISION]  # value = <INPUT_PRECISION.BF16x3: 3>
@@ -311,15 +311,15 @@ class INPUT_PRECISION:
 class MEM_SEMANTIC:
     """
     Memory semantic for atomic operations.
-    
+
     Members:
-    
+
       ACQUIRE_RELEASE : Acquire and release memory
-    
+
       ACQUIRE : Acquire memory
-    
+
       RELEASE : Release memory
-    
+
       RELAXED : Relaxed memory semantic
     """
     ACQUIRE: typing.ClassVar[MEM_SEMANTIC]  # value = <MEM_SEMANTIC.ACQUIRE: 1>
@@ -364,13 +364,13 @@ class MEM_SEMANTIC:
 class MEM_SYNC_SCOPE:
     """
     Memory synchronization scope enumeration class: specifies the scope of memory synchronization
-    
+
     Members:
-    
+
       GPU : GPU memory scope
-    
+
       CTA : CTA memory scope
-    
+
       SYSTEM : System memory scope
     """
     CTA: typing.ClassVar[MEM_SYNC_SCOPE]  # value = <MEM_SYNC_SCOPE.CTA: 1>
@@ -414,11 +414,11 @@ class MEM_SYNC_SCOPE:
 class PADDING_OPTION:
     """
     Filling option enumeration class: specifies the type of filling value when padding a tensor/array
-    
+
     Members:
-    
+
       PAD_ZERO : Pad with zero
-    
+
       PAD_NAN : Pad with NaN
     """
     PAD_NAN: typing.ClassVar[PADDING_OPTION]  # value = <PADDING_OPTION.PAD_NAN: 1>
@@ -461,11 +461,11 @@ class PADDING_OPTION:
 class PROPAGATE_NAN:
     """
     NaN propagation strategy enumeration class: specifies how NaN values are propagated in operations
-    
+
     Members:
-    
+
       NONE : Do not propagate NaN
-    
+
       ALL : Propagate all NaN
     """
     ALL: typing.ClassVar[PROPAGATE_NAN]  # value = <PROPAGATE_NAN.ALL: 65535>
@@ -508,11 +508,11 @@ class PROPAGATE_NAN:
 class ROUNDING_MODE:
     """
     Rounding mode enumeration class: specifies the rounding behavior of a floating-point operation
-    
+
     Members:
-    
+
       RTZ : Round towards zero
-    
+
       RTNE : Round towards nearest even
     """
     RTNE: typing.ClassVar[ROUNDING_MODE]  # value = <ROUNDING_MODE.RTNE: 1>
@@ -555,21 +555,21 @@ class ROUNDING_MODE:
 class SCALE_DOT_ELEM_TYPE:
     """
     Scale dot element type enumeration class: specifies the precision of scale dot product
-    
+
     Members:
-    
+
       E4M3 : E4M3 precision
-    
+
       E5M2 : E5M2 precision
-    
+
       E2M3 : E2M3 precision
-    
+
       E3M2 : E3M2 precision
-    
+
       E2M1 : E2M1 precision
-    
+
       BF16 : BF16 precision
-    
+
       FP16 : FP16 precision
     """
     BF16: typing.ClassVar[SCALE_DOT_ELEM_TYPE]  # value = <SCALE_DOT_ELEM_TYPE.BF16: 5>

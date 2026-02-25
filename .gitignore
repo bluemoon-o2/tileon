@@ -1,4 +1,6 @@
 .ruff_cache/
+.pytest_cache/
+
 __pycache__/
 
 python/tileon/_version.py

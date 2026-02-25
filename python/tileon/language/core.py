@@ -65,8 +65,7 @@ class _type:
         """
         Return a string that mangles the type into a unique identifier.
         """
-        raise NotImplementedError(
-            f"NYI: Type mangling for type {self.__class__}")
+        raise NotImplementedError(f"NYI: Type mangling for type {self.__class__}")
 
     def _unflatten_ir(self, handles: list, cursor: int) -> Tuple[_value, int]:
         """
@@ -351,10 +350,7 @@ class dtype(_type):
 
     SINT_TYPES = ['int8', 'int16', 'int32', 'int64']
     UINT_TYPES = ['int1', 'uint8', 'uint16', 'uint32', 'uint64']
-    FP_TYPES = [
-        'fp8e4b15', 'fp8e4nv', 'fp8e4b8', 'fp8e5', 'fp8e5b16', 'fp16', 'bf16',
-        'fp32', 'fp64'
-    ]
+    FP_TYPES = ['fp8e4b15', 'fp8e4nv', 'fp8e4b8', 'fp8e5', 'fp8e5b16', 'fp16', 'bf16', 'fp32', 'fp64']
     STANDARD_FP_TYPES = ['fp16', 'bf16', 'fp32', 'fp64']
     OTHER_TYPES = ['void']
 
@@ -632,12 +628,9 @@ class dtype(_type):
             The IR type.
         """
         if self.name.startswith("fp8"):
-            if (hasattr(builder, "options")
-                    and self.name not in builder.options.supported_fp8):
-                raise ValueError(
-                    f'type {self} not supported in this architecture. '
-                    f'The supported fp8 dtypes are {builder.options.supported_fp8}'
-                )
+            if (hasattr(builder, "options") and self.name not in builder.options.supported_fp8):
+                raise ValueError(f'type {self} not supported in this architecture. '
+                                 f'The supported fp8 dtypes are {builder.options.supported_fp8}')
 
         if self.name == 'void':
             return builder.get_void_t()
@@ -758,10 +751,7 @@ _DtypeClass = dtype
 class pointer_t(dtype):
     """The dtype for pointer."""
 
-    def __init__(self,
-                 element_t: dtype,
-                 address_space: int = 1,
-                 const: bool = False):
+    def __init__(self, element_t: dtype, address_space: int = 1, const: bool = False):
         """
         Create a new pointer dtype.
 
@@ -771,17 +761,14 @@ class pointer_t(dtype):
             const: Whether the pointer is const.
         """
         element_t = _unwrap_if_constexpr(element_t)
-        assert isinstance(
-            element_t, dtype
-        ), f'element_t expected `dtype`, got `{type(element_t).__name__}`.'
+        assert isinstance(element_t, dtype), f'element_t expected `dtype`, got `{type(element_t).__name__}`.'
         self.element_t = element_t
         self.address_space = address_space
         self.const = const
         self.name = f'pointer<{element_t}>' if not const else f'const_pointer<{element_t}>'
 
     def to_ir(self, builder):
-        return builder.get_ptr_t(self.element_t.to_ir(builder),
-                                 self.address_space)
+        return builder.get_ptr_t(self.element_t.to_ir(builder), self.address_space)
 
     def __str__(self):
         return self.name
@@ -799,8 +786,7 @@ class pointer_t(dtype):
         other = _unwrap_if_constexpr(other)
         if not isinstance(other, pointer_t):
             return False
-        return (self.element_t == other.element_t
-                and self.address_space == other.address_space
+        return (self.element_t == other.element_t and self.address_space == other.address_space
                 and self.const == other.const)
 
     @property
@@ -824,9 +810,7 @@ class block_t(dtype):
         """
         self.element_t = element_t
 
-        assert isinstance(
-            shape, (list, tuple)
-        ), f'shape has type `{type(shape).__name__}`; expected `list` or `tuple`.'
+        assert isinstance(shape, (list, tuple)), f'shape has type `{type(shape).__name__}`; expected `list` or `tuple`.'
 
         # shape can be empty ([]) when an input is a 0D tensor.
         self.shape = tuple(_unwrap_shape(shape))
@@ -921,9 +905,7 @@ class block_t(dtype):
 class tuple_t(_type):
     """The dtype for tuple."""
 
-    def __init__(self,
-                 types: Sequence[dtype],
-                 fields: Optional[Sequence[str]] = None):
+    def __init__(self, types: Sequence[dtype], fields: Optional[Sequence[str]] = None):
         self.types = types
         self.fields = fields
 
@@ -937,8 +919,7 @@ class tuple_t(_type):
         """
         if self.fields is None:
             return '[' + ','.join(str(v) for v in self.types) + ']'
-        return '[' + ','.join(
-            [f"{k}:{v}" for k, v in zip(self.fields, self.types)]) + ']'
+        return '[' + ','.join([f"{k}:{v}" for k, v in zip(self.fields, self.types)]) + ']'
 
     def __str__(self):
         return self.name
@@ -961,8 +942,7 @@ class tuple_t(_type):
         return self.types[index]
 
     def __eq__(self, other):
-        return (type(self) is type(other) and self.types == other.types
-                and self.fields == other.fields)
+        return (type(self) is type(other) and self.types == other.types and self.fields == other.fields)
 
     def _unflatten_ir(self, handles: List, cursor: int) -> Tuple[tuple, int]:
         """
@@ -1002,10 +982,7 @@ def _type_for_tuple(values: Sequence[Any], fields=None) -> tuple_t:
     Returns:
         The dtype for the tuple.
     """
-    return tuple_t([
-        constexpr_t(x) if isinstance(x, (int, float, dtype)) else x.type
-        for x in values
-    ], fields)
+    return tuple_t([constexpr_t(x) if isinstance(x, (int, float, dtype)) else x.type for x in values], fields)
 
 
 class tuple(_value):
@@ -1170,8 +1147,7 @@ def get_int_dtype(bitwidth: int, signed: bool) -> dtype:
     elif bitwidth == 64 and not signed:
         return uint64
     else:
-        raise ValueError(
-            f'Unsupported bitwidth {bitwidth} and signedness {signed}')
+        raise ValueError(f'Unsupported bitwidth {bitwidth} and signedness {signed}')
 
 
 # -----------------------------------------------------------------------------
@@ -1211,10 +1187,8 @@ def builtin(fn: T) -> T:
     @wraps(fn)
     def wrapper(*args, **kwargs):
         if "_semantic" not in kwargs or kwargs["_semantic"] is None:
-            raise ValueError(
-                "Did you forget to add @tileon.jit ? "
-                "(`_semantic` argument must be provided outside of JIT functions.)"
-            )
+            raise ValueError("Did you forget to add @tileon.jit ? "
+                             "(`_semantic` argument must be provided outside of JIT functions.)")
         return fn(*args, **kwargs)
 
     setattr(wrapper, TILEON_BUILTIN, True)
@@ -1264,8 +1238,7 @@ class tensor(_value):
             builder: The IR builder.
             name: The name to set.
         """
-        self.handle.set_loc(
-            builder.create_name_loc(name, self.handle.get_loc()))
+        self.handle.set_loc(builder.create_name_loc(name, self.handle.get_loc()))
 
     def _flatten_ir(self, handles: List) -> None:
         """
@@ -1277,8 +1250,7 @@ class tensor(_value):
         handles.append(self.handle)
 
     def __str__(self) -> str:
-        return str(self.dtype) + '(' + ', '.join(str(s)
-                                                 for s in self.shape) + ')'
+        return str(self.dtype) + '(' + ', '.join(str(s) for s in self.shape) + ')'
 
     @builtin
     def __add__(self, other, _semantic=None):
@@ -1498,8 +1470,7 @@ class tensor(_value):
         Returns:
             The sliced tensor.
         """
-        if slices is None or isinstance(slices,
-                                        (builtins.slice, slice, constexpr)):
+        if slices is None or isinstance(slices, (builtins.slice, slice, constexpr)):
             slices = [slices]
         if isinstance(slices, tuple):
             slices = slices.values
@@ -1507,9 +1478,8 @@ class tensor(_value):
         for dim, sl in enumerate(slices):
             if _unwrap_if_constexpr(sl) is None:
                 ret = _semantic.expand_dims(ret, dim)
-            elif (isinstance(sl, (builtins.slice, slice)) and all(
-                    _unwrap_if_constexpr(x) is None
-                    for x in (sl.start, sl.stop, sl.step))):
+            elif (isinstance(sl, (builtins.slice, slice))
+                  and all(_unwrap_if_constexpr(x) is None for x in (sl.start, sl.stop, sl.step))):
                 pass
             else:
                 raise ValueError(f"unsupported tensor index: {sl}")
@@ -1521,11 +1491,7 @@ class tensor(_value):
         raise RuntimeError("Transposition must be created by the AST Visitor")
 
     @builtin
-    def to(self,
-           dtype: dtype,
-           fp_downcast_rounding: Optional[str] = None,
-           bitcast: bool = False,
-           _semantic=None):
+    def to(self, dtype: dtype, fp_downcast_rounding: Optional[str] = None, bitcast: bool = False, _semantic=None):
         """
         Alias for :py:func:`tensor.cast`.
 
@@ -1537,11 +1503,7 @@ class tensor(_value):
         Returns:
             The cast tensor.
         """
-        return cast(self,
-                    dtype,
-                    fp_downcast_rounding,
-                    bitcast,
-                    _semantic=_semantic)
+        return cast(self, dtype, fp_downcast_rounding, bitcast, _semantic=_semantic)
 
     # Type stubs for functions added by the _tensor_member_fn decorator.
     def broadcast_to(self, *shape) -> tensor:
@@ -1568,12 +1530,7 @@ class tensor(_value):
     def cast(self, dtype, fp_downcast_rounding=None, bitcast=False) -> tensor:
         ...
 
-    def store(self,
-              value,
-              mask=None,
-              boundary_check=(),
-              cache_modifier="",
-              eviction_policy="") -> tensor:
+    def store(self, value, mask=None, boundary_check=(), cache_modifier="", eviction_policy="") -> tensor:
         ...
 
     def advance(self, offsets) -> tensor:
@@ -1642,30 +1599,19 @@ class tensor(_value):
     def sigmoid(self) -> tensor:
         ...
 
-    def softmax(self,
-                dim=None,
-                keep_dims=False,
-                ieee_rounding=False) -> tensor:
+    def softmax(self, dim=None, keep_dims=False, ieee_rounding=False) -> tensor:
         ...
 
     def ravel(self) -> tensor:
         ...
 
-    def max(self,
-            axis=None,
-            return_indices=False,
-            return_indices_tie_break_left=True,
-            keep_dims=False) -> tensor:
+    def max(self, axis=None, return_indices=False, return_indices_tie_break_left=True, keep_dims=False) -> tensor:
         ...
 
     def argmax(self, axis, tie_break_left=True, keep_dims=False) -> tensor:
         ...
 
-    def min(self,
-            axis=None,
-            return_indices=False,
-            return_indices_tie_break_left=True,
-            keep_dims=False) -> tensor:
+    def min(self, axis=None, return_indices=False, return_indices_tie_break_left=True, keep_dims=False) -> tensor:
         ...
 
     def argmin(self, axis, tie_break_left=True, keep_dims=False) -> tensor:
@@ -1686,9 +1632,7 @@ class tensor(_value):
     def cumprod(self, axis=0, reverse=False) -> tensor:
         ...
 
-    def sort(self,
-             dim: constexpr = None,
-             descending: constexpr = CONSTEXPR_0) -> tensor:
+    def sort(self, dim: constexpr = None, descending: constexpr = CONSTEXPR_0) -> tensor:
         ...
 
     def flip(self, dim=None) -> tensor:
@@ -1716,10 +1660,8 @@ def check_bit_width(value, shift_value):
     """
     bitwidth = value.type.scalar.primitive_bitwidth
     if shift_value >= bitwidth:
-        warnings.warn(
-            f"Value {shift_value} exceeds the maximum bitwidth ({bitwidth}) "
-            f"for type '{value.dtype}'. This may result in undefined behavior."
-        )
+        warnings.warn(f"Value {shift_value} exceeds the maximum bitwidth ({bitwidth}) "
+                      f"for type '{value.dtype}'. This may result in undefined behavior.")
 
 
 class _tensor_descriptor_t(_type):
@@ -1730,8 +1672,7 @@ class _tensor_descriptor_t(_type):
     def __init__(self, block_t: block_t):
         self.block_t = block_t
 
-    def _unflatten_ir(self, handles: List,
-                      cursor: int) -> Tuple[_tensor_descriptor, int]:
+    def _unflatten_ir(self, handles: List, cursor: int) -> Tuple[_tensor_descriptor, int]:
         """
         Unflatten the IR value of the tensor descriptor.
 
@@ -1754,9 +1695,7 @@ class _tensor_descriptor_t(_type):
             out: The list of IR types.
         """
         is_signed = self.block_t.element_t.is_int_signed()
-        out.append(
-            builder.create_tensor_descriptor_t(self.block_t.to_ir(builder),
-                                               is_signed))
+        out.append(builder.create_tensor_descriptor_t(self.block_t.to_ir(builder), is_signed))
 
     def __str__(self) -> str:
         return f"tensor_descriptor<{self.block_t}>"
@@ -1791,8 +1730,7 @@ class _tensor_descriptor(_value):
             builder: The IR builder.
             name: The name of the tensor descriptor.
         """
-        self.handle.set_loc(
-            builder.create_name_loc(name, self.handle.get_loc()))
+        self.handle.set_loc(builder.create_name_loc(name, self.handle.get_loc()))
 
     def _flatten_ir(self, handles: List) -> None:
         """
@@ -1819,9 +1757,7 @@ class _tensor_descriptor(_value):
         return str(self.type)
 
     @builtin
-    def load(self,
-             offsets: Sequence[constexpr | tensor],
-             _semantic=None) -> tensor:
+    def load(self, offsets: Sequence[constexpr | tensor], _semantic=None) -> tensor:
         """
         Load a block from the descriptor starting at the given element offsets.
 
@@ -1832,10 +1768,7 @@ class _tensor_descriptor(_value):
         return _semantic.descriptor_load(self, offsets, "", "")
 
     @builtin
-    def store(self,
-              offsets: Sequence[constexpr | tensor],
-              value: tensor,
-              _semantic=None) -> tensor:
+    def store(self, offsets: Sequence[constexpr | tensor], value: tensor, _semantic=None) -> tensor:
         """
         Store a block from the descriptor starting at the given element offsets.
 
@@ -1846,53 +1779,33 @@ class _tensor_descriptor(_value):
         return _semantic.descriptor_store(self, value, offsets)
 
     @builtin
-    def atomic_add(self,
-                   offsets: Sequence[constexpr | tensor],
-                   value: tensor,
-                   _semantic=None) -> tensor:
+    def atomic_add(self, offsets: Sequence[constexpr | tensor], value: tensor, _semantic=None) -> tensor:
         return _semantic.descriptor_atomic_add(self, value, offsets)
 
     @builtin
-    def atomic_min(self,
-                   offsets: Sequence[constexpr | tensor],
-                   value: tensor,
-                   _semantic=None) -> tensor:
+    def atomic_min(self, offsets: Sequence[constexpr | tensor], value: tensor, _semantic=None) -> tensor:
         return _semantic.descriptor_atomic_min(self, value, offsets)
 
     @builtin
-    def atomic_max(self,
-                   offsets: Sequence[constexpr | tensor],
-                   value: tensor,
-                   _semantic=None) -> tensor:
+    def atomic_max(self, offsets: Sequence[constexpr | tensor], value: tensor, _semantic=None) -> tensor:
         return _semantic.descriptor_atomic_max(self, value, offsets)
 
     @builtin
-    def atomic_and(self,
-                   offsets: Sequence[constexpr | tensor],
-                   value: tensor,
-                   _semantic=None) -> tensor:
+    def atomic_and(self, offsets: Sequence[constexpr | tensor], value: tensor, _semantic=None) -> tensor:
         return _semantic.descriptor_atomic_and(self, value, offsets)
 
     @builtin
-    def atomic_or(self,
-                  offsets: Sequence[constexpr | tensor],
-                  value: tensor,
-                  _semantic=None) -> tensor:
+    def atomic_or(self, offsets: Sequence[constexpr | tensor], value: tensor, _semantic=None) -> tensor:
         return _semantic.descriptor_atomic_or(self, value, offsets)
 
     @builtin
-    def atomic_xor(self,
-                   offsets: Sequence[constexpr | tensor],
-                   value: tensor,
-                   _semantic=None) -> tensor:
+    def atomic_xor(self, offsets: Sequence[constexpr | tensor], value: tensor, _semantic=None) -> tensor:
         return _semantic.descriptor_atomic_xor(self, value, offsets)
 
     @builtin
     def gather(self, *args, _semantic=None) -> tensor:
         """Gather multiple descriptors worth of data"""
-        assert len(
-            args
-        ) == 2, f"descriptor gather only supports 2D indexing, but got {len(args)}"
+        assert len(args) == 2, f"descriptor gather only supports 2D indexing, but got {len(args)}"
         x_offsets = args[0]
         y_offset = args[1]
         return _semantic.descriptor_gather(self, x_offsets, y_offset, "", "")
@@ -1900,9 +1813,7 @@ class _tensor_descriptor(_value):
     @builtin
     def scatter(self, value, *args, _semantic=None) -> tensor:
         """Scatter multiple descriptors worth of data"""
-        assert len(
-            args
-        ) == 2, f"descriptor scatter only supports 2D indexing, but got {len(args)}"
+        assert len(args) == 2, f"descriptor scatter only supports 2D indexing, but got {len(args)}"
         x_offsets = args[0]
         y_offset = args[1]
         return _semantic.descriptor_scatter(self, value, x_offsets, y_offset)
@@ -1918,8 +1829,7 @@ class tensor_descriptor_t(_tensor_descriptor_t):
         self.shape_t = shape_t
         self.strides_t = strides_t
 
-    def _unflatten_ir(self, handles: List,
-                      cursor: int) -> Tuple[_tensor_descriptor, int]:
+    def _unflatten_ir(self, handles: List, cursor: int) -> Tuple[_tensor_descriptor, int]:
         """
         Unflatten the IR value of the tensor descriptor.
 
@@ -1952,8 +1862,7 @@ class tensor_descriptor_t(_tensor_descriptor_t):
         self.strides_t._flatten_ir_types(builder, out)
 
     def __eq__(self, other):
-        return (super().__eq__(other) and self.shape_t == other.shape_t
-                and self.strides_t == other.strides_t)
+        return (super().__eq__(other) and self.shape_t == other.shape_t and self.strides_t == other.strides_t)
 
 
 class tensor_descriptor(_tensor_descriptor):
@@ -1961,8 +1870,7 @@ class tensor_descriptor(_tensor_descriptor):
     A descriptor representing a tensor in global memory.
     """
 
-    def __init__(self, handle, shape: List[tensor], strides: List[tensor],
-                 block_t: block_t):
+    def __init__(self, handle, shape: List[tensor], strides: List[tensor], block_t: block_t):
         """
         Create a tensor descriptor.
 
@@ -2023,8 +1931,7 @@ class _aggregate_t(_type):
     base_cls: type
     fields: List[Tuple[str, _type]]
 
-    def _unflatten_ir(self, handles: List[ir.value],
-                      cursor: int) -> Tuple[ir.value, int]:
+    def _unflatten_ir(self, handles: List[ir.value], cursor: int) -> Tuple[ir.value, int]:
         """
         Unflatten the IR value of the aggregate type.
 
@@ -2097,32 +2004,25 @@ def _aggregate(cls):
 
         def init(self, *args, **kwargs):
             if len(args) > len(field_names):
-                raise TypeError(
-                    f"{cls.__name__}.__init__() takes {len(field_names) + 1} positional arguments "
-                    f"but {len(args) + 1} were given")
+                raise TypeError(f"{cls.__name__}.__init__() takes {len(field_names) + 1} positional arguments "
+                                f"but {len(args) + 1} were given")
 
             for idx, name in enumerate(field_names):
                 if idx < len(args):
                     if name in kwargs:
-                        raise TypeError(
-                            f"{cls.__name__}.__init__() got multiple values for argument '{name}'"
-                        )
+                        raise TypeError(f"{cls.__name__}.__init__() got multiple values for argument '{name}'")
                     value = args[idx]
                 elif name in kwargs:
                     value = kwargs.pop(name)
                 else:
-                    raise TypeError(
-                        f"{cls.__name__}.__init__() missing required argument: '{name}'"
-                    )
+                    raise TypeError(f"{cls.__name__}.__init__() missing required argument: '{name}'")
 
                 value = _wrap_init_args(value)
                 setattr(self, name, value)
 
             if kwargs:
                 unexpected = next(iter(kwargs))
-                raise TypeError(
-                    f"{cls.__name__}.__init__() got an unexpected keyword argument '{unexpected}'"
-                )
+                raise TypeError(f"{cls.__name__}.__init__() got an unexpected keyword argument '{unexpected}'")
 
         init.__tileon_builtin__ = True
 
@@ -2136,18 +2036,12 @@ def _aggregate(cls):
         def _get_instance(this_cls):
             return super().__new__(this_cls)
 
-        def __new__(this_cls,
-                    *args,
-                    _semantic=None,
-                    _generator=None,
-                    **kwargs):
+        def __new__(this_cls, *args, _semantic=None, _generator=None, **kwargs):
             # Call into the user-defined constructor.
             instance = this_cls._get_instance()
             extra_kwargs = {}
             if isinstance(init, JITCallable):
-                raise ValueError(
-                    f"{cls.__name__}.__init__ cannot be a @tileon.jit function"
-                )
+                raise ValueError(f"{cls.__name__}.__init__ cannot be a @tileon.jit function")
             else:
                 if "_semantic" in inspect.signature(init).parameters:
                     extra_kwargs["_semantic"] = _semantic
@@ -2158,21 +2052,16 @@ def _aggregate(cls):
             # Require that the user-defined constructor initialized all fields.
             for name in cls.__annotations__.keys():
                 if not hasattr(instance, name):
-                    raise AttributeError(
-                        f"constructor for {cls.__name__} did not initialize attribute '{name}'"
-                    )
+                    raise AttributeError(f"constructor for {cls.__name__} did not initialize attribute '{name}'")
 
             return instance
 
         # Only allow setting attributes defined in the class annotations.
         def __setattr__(self, name, value):
             if name not in cls.__annotations__:
-                raise AttributeError(
-                    f"{cls.__name__} has no attribute '{name}'")
+                raise AttributeError(f"{cls.__name__} has no attribute '{name}'")
             if not isinstance(value, cls.__annotations__[name]):
-                raise TypeError(
-                    f"Expected {cls.__annotations__[name]} for attribute '{name}', got {type(value)}"
-                )
+                raise TypeError(f"Expected {cls.__annotations__[name]} for attribute '{name}', got {type(value)}")
             super().__setattr__(name, value)
 
         def _set_name(self, builder: ir.builder, name: str) -> None:
@@ -2184,8 +2073,7 @@ def _aggregate(cls):
                 name: The name of the aggregate value.
             """
             for key_name in cls.__annotations__.keys():
-                getattr(self, key_name)._set_name(builder,
-                                                  f"{name}.{key_name}")
+                getattr(self, key_name)._set_name(builder, f"{name}.{key_name}")
 
         def _flatten_ir(self, handles: List[ir.value]) -> None:
             """
@@ -2206,14 +2094,12 @@ def _aggregate(cls):
                 The type of the aggregate value.
             """
             return _aggregate_t(aggregate_value,
-                                [(name, getattr(self, name).type)
-                                 for name in cls.__annotations__.keys()])
+                                [(name, getattr(self, name).type) for name in cls.__annotations__.keys()])
 
     hash_attrs = [init]
 
     for name, member in inspect.getmembers(cls):
-        if inspect.isfunction(member) or inspect.ismethod(
-                member) or isinstance(member, JITCallable):
+        if inspect.isfunction(member) or inspect.ismethod(member) or isinstance(member, JITCallable):
             if name != "__init__":
                 setattr(aggregate_value, name, member)
                 hash_attrs.append(member)
@@ -2344,16 +2230,13 @@ def tensor_member(fn: T) -> T:
     Returns:
         The decorated function.
     """
-    assert callable(fn), (
-        "tensor_member decorator must be applied to a function, "
-        f"but got {type(fn)}"
-    )
+    assert callable(fn), ("tensor_member decorator must be applied to a function, "
+                          f"but got {type(fn)}")
 
     orig_sig = inspect.signature(fn)
     sig_len = len(orig_sig.parameters.keys() - {"_semantic", "_generator"})
-    assert sig_len > 0, (
-        "tensor_member decorator must be applied to a function with "
-        f"at least one argument, but got {sig_len}")
+    assert sig_len > 0, ("tensor_member decorator must be applied to a function with "
+                         f"at least one argument, but got {sig_len}")
 
     if sig_len > 1:
         args1, args2 = "...", ", ..."
@@ -2493,8 +2376,7 @@ def transpose(input: tensor, *dims, _semantic=None):
     if not dims:
         n = len(input.shape)
         if n < 2:
-            raise ValueError(
-                "tl.transpose invoked with a 0- or 1-dimensional tensor")
+            raise ValueError("tl.transpose invoked with a 0- or 1-dimensional tensor")
         dims = list(builtins.range(n - 2)) + [n - 1, n - 2]
     return _semantic.permute(input, dims)
 
@@ -2540,8 +2422,7 @@ def _wrap_axis(axis: int, ndim: int) -> int:
         int: The wrapped axis.
     """
     if not (-ndim <= axis < ndim):
-        raise ValueError(
-            f"invalid axis {axis}. Expected {-ndim} <= axis < {ndim}")
+        raise ValueError(f"invalid axis {axis}. Expected {-ndim} <= axis < {ndim}")
 
     return axis if axis >= 0 else axis + ndim
 
@@ -2568,15 +2449,10 @@ def cat(input, other, dim=0, can_reorder=False, _semantic=None):
         return _semantic.cat(input, other, can_reorder)
 
     rank = len(input.shape)
-    assert rank == len(
-        other.shape
-    ), f"tensors must have the same rank, got {rank} and {len(other.shape)}"
+    assert rank == len(other.shape), f"tensors must have the same rank, got {rank} and {len(other.shape)}"
     dim = _wrap_axis(_unwrap_if_constexpr(dim), rank)
-    assert all(
-        input.shape[i] == other.shape[i] for i in builtins.range(rank)
-        if i != dim
-    ), (f"tensor dims must match except in the concat dimension {dim}, got {input.shape} and {other.shape}"
-        )
+    assert all(input.shape[i] == other.shape[i] for i in builtins.range(rank) if i != dim), (
+        f"tensor dims must match except in the concat dimension {dim}, got {input.shape} and {other.shape}")
 
     # Join introduces a new minor dim; move it before the concat dim and merge.
     c = join(input, other, _semantic=_semantic)
@@ -2696,8 +2572,7 @@ def reshape(input, *shape, can_reorder=False, _semantic=None):
     return _semantic.reshape(input, shape, can_reorder)
 
 
-@deprecated(
-    "tl.view is deprecated, please use reshape with can_reorder=True.", )
+@deprecated("tl.view is deprecated, please use reshape with can_reorder=True.", )
 @tensor_member
 @builtin
 def view(input, *shape, _semantic=None):
@@ -2759,8 +2634,7 @@ def expand_dims(input, axis, _semantic=None):
     axes = [_wrap_axis(_unwrap_if_constexpr(d), new_ndim) for d in axes]
 
     if len(set(axes)) != len(axes):
-        raise ValueError(
-            f"expand_dims received duplicate axes, normalized axes = {axes}")
+        raise ValueError(f"expand_dims received duplicate axes, normalized axes = {axes}")
 
     ret = input
     for a in sorted(axes):
@@ -2770,11 +2644,7 @@ def expand_dims(input, axis, _semantic=None):
 
 @tensor_member
 @builtin
-def cast(input,
-         dtype: dtype,
-         fp_downcast_rounding: Optional[str] = None,
-         bitcast: bool = False,
-         _semantic=None):
+def cast(input, dtype: dtype, fp_downcast_rounding: Optional[str] = None, bitcast: bool = False, _semantic=None):
     """
     Casts a tensor to the given :code:`dtype`.
 
@@ -2845,8 +2715,7 @@ def dot(input,
     assert input_precision is None or allow_tf32 is None, "Only one of input_precision and allow_tf32 can be specified"
     if input_precision is None:
         supports_tf32 = "tf32" in _semantic.builder.options.allowed_dot_input_precisions
-        input_precision = (knobs.language.fp32_default or "tf32"
-                           if supports_tf32 and
+        input_precision = (knobs.language.fp32_default or "tf32" if supports_tf32 and
                            (allow_tf32 or allow_tf32 is None) else "ieee")
 
     input_precision = _unwrap_if_constexpr(input_precision)
@@ -2856,13 +2725,9 @@ def dot(input,
 
     a_shape = list(input.shape)
     b_shape = list(other.shape)
-    assert len(a_shape) == len(
-        b_shape) >= 2, "input and other must have equal ranks >= 2"
-    assert a_shape[:
-                   -2] == b_shape[:
-                                  -2], "input and other must have equal batch shapes"
-    assert a_shape[-1] == b_shape[
-        -2], "input and other must have equal reduction dimensions"
+    assert len(a_shape) == len(b_shape) >= 2, "input and other must have equal ranks >= 2"
+    assert a_shape[:-2] == b_shape[:-2], "input and other must have equal batch shapes"
+    assert a_shape[-1] == b_shape[-2], "input and other must have equal reduction dimensions"
 
     # compute shape of accumulator:
     c_shape = a_shape[:-1] + [b_shape[-1]]
@@ -2874,16 +2739,12 @@ def dot(input,
         batch_size = 1
         for i in builtins.range(rank - 2):
             batch_size *= c_shape[i]
-        input = _semantic.reshape(input, [batch_size] + a_shape[-2:],
-                                  can_reorder=False)
-        other = _semantic.reshape(other, [batch_size] + b_shape[-2:],
-                                  can_reorder=False)
+        input = _semantic.reshape(input, [batch_size] + a_shape[-2:], can_reorder=False)
+        other = _semantic.reshape(other, [batch_size] + b_shape[-2:], can_reorder=False)
         if acc is not None:
-            acc = _semantic.reshape(acc, [batch_size] + c_shape[-2:],
-                                    can_reorder=False)
+            acc = _semantic.reshape(acc, [batch_size] + c_shape[-2:], can_reorder=False)
 
-    res = _semantic.dot(input, other, acc, input_precision,
-                        max_num_imprecise_acc, out_dtype)
+    res = _semantic.dot(input, other, acc, input_precision, max_num_imprecise_acc, out_dtype)
 
     if rank >= 4:
         res = _semantic.reshape(res, c_shape, can_reorder=False)
@@ -2942,8 +2803,7 @@ def dot_scaled(lhs,
     out_dtype = _unwrap_if_constexpr(out_dtype)
     acc = _unwrap_if_constexpr(acc)
     assert out_dtype == float32, "Only float32 is supported for out_dtype at the moment"
-    return _semantic.dot_scaled(lhs, lhs_scale, lhs_format, rhs, rhs_scale,
-                                rhs_format, acc, fast_math, lhs_k_pack,
+    return _semantic.dot_scaled(lhs, lhs_scale, lhs_format, rhs, rhs_scale, rhs_format, acc, fast_math, lhs_k_pack,
                                 rhs_k_pack, out_dtype)
 
 
@@ -3023,14 +2883,12 @@ def load(pointer,
     cache_modifier = _unwrap_if_constexpr(cache_modifier)
     eviction_policy = _unwrap_if_constexpr(eviction_policy)
     volatile = _unwrap_if_constexpr(volatile)
-    return _semantic.load(pointer, mask, other, boundary_check, padding_option,
-                          cache_modifier, eviction_policy, volatile)
+    return _semantic.load(pointer, mask, other, boundary_check, padding_option, cache_modifier, eviction_policy,
+                          volatile)
 
 
 @builtin
-def load_tensor_descriptor(desc: _tensor_descriptor,
-                           offsets: Sequence[constexpr | tensor],
-                           _semantic=None) -> tensor:
+def load_tensor_descriptor(desc: _tensor_descriptor, offsets: Sequence[constexpr | tensor], _semantic=None) -> tensor:
     """
     Load a block of data from a tensor descriptor.
 
@@ -3065,13 +2923,7 @@ def store_tensor_descriptor(desc: _tensor_descriptor,
 
 @tensor_member
 @builtin
-def store(pointer,
-          value,
-          mask=None,
-          boundary_check=(),
-          cache_modifier="",
-          eviction_policy="",
-          _semantic=None):
+def store(pointer, value, mask=None, boundary_check=(), cache_modifier="", eviction_policy="", _semantic=None):
     """
     Store a tensor of data into memory locations defined by `pointer`.
 
@@ -3128,18 +2980,11 @@ def store(pointer,
         mask = _semantic.to_tensor(mask)
     cache_modifier = _unwrap_if_constexpr(cache_modifier)
     eviction_policy = _unwrap_if_constexpr(eviction_policy)
-    return _semantic.store(pointer, value, mask, boundary_check,
-                           cache_modifier, eviction_policy)
+    return _semantic.store(pointer, value, mask, boundary_check, cache_modifier, eviction_policy)
 
 
 @builtin
-def make_block_ptr(base: tensor,
-                   shape,
-                   strides,
-                   offsets,
-                   block_shape,
-                   order,
-                   _semantic=None):
+def make_block_ptr(base: tensor, shape, strides, offsets, block_shape, order, _semantic=None):
     """
     Returns a pointer to a block in a parent tensor.
 
@@ -3151,12 +2996,10 @@ def make_block_ptr(base: tensor,
         block_shape: The shape of the block
         order: The order of the original data format
     """
-    return _semantic.make_block_ptr(base, shape, strides, offsets, block_shape,
-                                    order)
+    return _semantic.make_block_ptr(base, shape, strides, offsets, block_shape, order)
 
 
-def must_use_result(func: Union[Callable, str],
-                    flag: Union[bool, str] = True) -> Callable:
+def must_use_result(func: Union[Callable, str], flag: Union[bool, str] = True) -> Callable:
     """A wrapper function that marks the result of the decorated function as must be used.
 
     Args:
@@ -3170,9 +3013,8 @@ def must_use_result(func: Union[Callable, str],
     return func
 
 
-@must_use_result(
-    "Note that tl.advance does not have any side effects. To move the block pointer, "
-    "you need to assign the result of tl.advance to a variable.")
+@must_use_result("Note that tl.advance does not have any side effects. To move the block pointer, "
+                 "you need to assign the result of tl.advance to a variable.")
 @tensor_member
 @builtin
 def advance(base, offsets, _semantic=None):
@@ -3245,8 +3087,7 @@ def make_tensor_descriptor(
     """
 
     padding_option = _unwrap_if_constexpr(padding_option)
-    return _semantic.make_tensor_descriptor(base, shape, strides, block_shape,
-                                            padding_option)
+    return _semantic.make_tensor_descriptor(base, shape, strides, block_shape, padding_option)
 
 
 # -----------------------------------------------------------------------------
@@ -3474,10 +3315,7 @@ def _promote_bf16_to_f32(t: tensor, _semantic=None):
 
 
 @builtin
-def minimum(x,
-            y,
-            propagate_nan: constexpr = PropagateNan.NONE,
-            _semantic=None):
+def minimum(x, y, propagate_nan: constexpr = PropagateNan.NONE, _semantic=None):
     """
     Computes the element-wise minimum of x and y.
 
@@ -3501,10 +3339,7 @@ def minimum(x,
 
 
 @builtin
-def maximum(x,
-            y,
-            propagate_nan: constexpr = PropagateNan.NONE,
-            _semantic=None):
+def maximum(x, y, propagate_nan: constexpr = PropagateNan.NONE, _semantic=None):
     """
     Computes the element-wise maximum of :code:`x` and :code:`y`.
 
@@ -3528,11 +3363,7 @@ def maximum(x,
 
 
 @builtin
-def clamp(x,
-          min,
-          max,
-          propagate_nan: constexpr = PropagateNan.NONE,
-          _semantic=None):
+def clamp(x, min, max, propagate_nan: constexpr = PropagateNan.NONE, _semantic=None):
     """
     Clamps the input tensor :code:`x` within the range [min, max].
     Behavior when :code:`min` > :code:`max` is undefined.
@@ -3562,12 +3393,10 @@ def clamp(x,
 # -----------------------------------------------------------------------------
 
 
-def add_reduction_docstr(
-    name: str,
-    return_indices_arg: Optional[str] = None,
-    tie_break_arg: Optional[str] = None,
-    dtype_arg: Optional[str] = None
-) -> Callable[[T], T]:
+def add_reduction_docstr(name: str,
+                         return_indices_arg: Optional[str] = None,
+                         tie_break_arg: Optional[str] = None,
+                         dtype_arg: Optional[str] = None) -> Callable[[T], T]:
 
     def _decorator(func: T) -> T:
         docstr = f"""
@@ -3614,14 +3443,7 @@ def insertion_guard(builder):
 
 @tensor_member
 @builtin
-def reduce(
-    input,
-    axis,
-    combine_fn,
-    keep_dims=False,
-    _semantic=None,
-    _generator=None
-):
+def reduce(input, axis, combine_fn, keep_dims=False, _semantic=None, _generator=None):
     """Applies the combine_fn to all elements in :code:`input` tensors along the provided :code:`axis`
 
     Args:
@@ -3634,12 +3456,7 @@ def reduce(
         Tensor: the reduced tensor
     """
     if isinstance(input, tensor):
-        return reduce((input, ),
-                      axis,
-                      combine_fn,
-                      keep_dims=keep_dims,
-                      _semantic=_semantic,
-                      _generator=_generator)[0]
+        return reduce((input, ), axis, combine_fn, keep_dims=keep_dims, _semantic=_semantic, _generator=_generator)[0]
 
     def make_combine_region(reduce_op):
         param_types = [t.type.scalar for t in input] * 2
@@ -3647,11 +3464,8 @@ def reduce(
         builder = _semantic.builder
         with insertion_guard(builder):
             to_ir = lambda T: T.to_ir(builder)
-            block = builder.create_block_with_parent(
-                region, list(map(to_ir, param_types)))
-            args = [
-                tensor(block.arg(i), ty) for i, ty in enumerate(param_types)
-            ]
+            block = builder.create_block_with_parent(region, list(map(to_ir, param_types)))
+            args = [tensor(block.arg(i), ty) for i, ty in enumerate(param_types)]
             results = _generator.call_JitFunction(combine_fn, args, kwargs={})
             if isinstance(results, tensor):
                 handles = [results.handle]
@@ -3678,12 +3492,7 @@ def reduce(
 
 
 @builtin
-def _reduce_with_indices(input,
-                         axis,
-                         combine_fn,
-                         keep_dims=False,
-                         _semantic=None,
-                         _generator=None):
+def _reduce_with_indices(input, axis, combine_fn, keep_dims=False, _semantic=None, _generator=None):
     """Applies the combine_fn to all elements in :code:`input` tensors along the provided :code:`axis`,
     and returns the indices of the elements that contribute to the reduction.
 
@@ -3699,9 +3508,7 @@ def _reduce_with_indices(input,
 
     if len(input.shape) > 1:
         # Broadcast index across the non-reduced axes
-        axes_to_expand = [
-            constexpr(d) for d in builtins.range(len(input.shape))
-        ]
+        axes_to_expand = [constexpr(d) for d in builtins.range(len(input.shape))]
         del axes_to_expand[axis]
         index = expand_dims(index, axes_to_expand, _semantic=_semantic)
         index = broadcast_to(index, input.shape, _semantic=_semantic)
@@ -3748,12 +3555,7 @@ def add_scan_docstr(name: str, dtype_arg: str = None) -> Callable[[T], T]:
 
 @tensor_member
 @builtin
-def associative_scan(input,
-                     axis,
-                     combine_fn,
-                     reverse=False,
-                     _semantic=None,
-                     _generator=None):
+def associative_scan(input, axis, combine_fn, reverse=False, _semantic=None, _generator=None):
     """Applies the combine_fn to each elements with a carry in :code:`input` tensors along
     the provided :code:`axis` and update the carry
 
@@ -3764,12 +3566,7 @@ def associative_scan(input,
         reverse(bool): whether to apply the associative scan in the reverse direction along axis
     """
     if isinstance(input, tensor):
-        return associative_scan((input, ),
-                                axis,
-                                combine_fn,
-                                reverse,
-                                _semantic=_semantic,
-                                _generator=_generator)[0]
+        return associative_scan((input, ), axis, combine_fn, reverse, _semantic=_semantic, _generator=_generator)[0]
 
     def make_combine_region(scan_op):
         param_types = [t.type.scalar for t in input] * 2
@@ -3777,11 +3574,8 @@ def associative_scan(input,
         builder = _semantic.builder
         with insertion_guard(builder):
             to_ir = lambda T: T.to_ir(builder)
-            block = builder.create_block_with_parent(
-                region, list(map(to_ir, param_types)))
-            args = [
-                tensor(block.arg(i), ty) for i, ty in enumerate(param_types)
-            ]
+            block = builder.create_block_with_parent(region, list(map(to_ir, param_types)))
+            args = [tensor(block.arg(i), ty) for i, ty in enumerate(param_types)]
             results = _generator.call_JitFunction(combine_fn, args, kwargs={})
             if isinstance(results, tensor):
                 handles = [results.handle]
@@ -3792,8 +3586,7 @@ def associative_scan(input,
     axis = _unwrap_if_constexpr(axis)
     if axis is not None:
         axis = _wrap_axis(axis, len(input[0].shape))
-    return _semantic.associative_scan(input, axis, make_combine_region,
-                                      reverse)
+    return _semantic.associative_scan(input, axis, make_combine_region, reverse)
 
 
 @tensor_member
@@ -3886,9 +3679,7 @@ def map_elementwise(
 
     with insertion_guard(builder):
         builder.set_insertion_point_to_start(block)
-        scalar_results = _generator.call_JitFunction(scalar_fn,
-                                                     scalar_args,
-                                                     kwargs={})
+        scalar_results = _generator.call_JitFunction(scalar_fn, scalar_args, kwargs={})
 
         is_single = isinstance(scalar_results, tensor)
         if is_single:
@@ -3903,16 +3694,14 @@ def map_elementwise(
     if pack > 1:
         scalar_result_types = fn_result_types[::pack]
         for offset in builtins.range(1, pack):
-            assert scalar_result_types == fn_result_types[
-                offset::pack], "type mismatch in unpacked results"
+            assert scalar_result_types == fn_result_types[offset::pack], "type mismatch in unpacked results"
 
     def make_elementwise_region(elementwise_op):
         region = elementwise_op.get_region(0)
         region.push_back(block)
 
     builder.set_loc(original_loc)
-    result = _semantic.map_elementwise(tensors, scalar_result_types, pack,
-                                       make_elementwise_region)
+    result = _semantic.map_elementwise(tensors, scalar_result_types, pack, make_elementwise_region)
     return result[0] if is_single else result
 
 
@@ -3936,11 +3725,9 @@ def _unwrap_hint_values(values):
     if isinstance(values, constexpr):
         values = [values]
     for i, t in enumerate(values):
+        assert isinstance(t, constexpr), f"values element {i} must have type `constexpr`"
         assert isinstance(
-            t, constexpr), f"values element {i} must have type `constexpr`"
-        assert isinstance(t.value, int), (
-            f"values element {i} must have type `constexpr[int]`, got `constexpr[{type(t.value)}]`"
-        )
+            t.value, int), (f"values element {i} must have type `constexpr[int]`, got `constexpr[{type(t.value)}]`")
     return [x.value for x in values]
 
 
@@ -3988,12 +3775,7 @@ def assume(cond, _semantic=None):
 
 
 @builtin
-def static_print(*values,
-                 sep: str = " ",
-                 end: str = "\n",
-                 file=None,
-                 flush=False,
-                 _semantic=None):
+def static_print(*values, sep: str = " ", end: str = "\n", file=None, flush=False, _semantic=None):
     """
     Print the values at compile time.
     The parameters are the same as the builtin :code:`print`.
@@ -4237,14 +4019,11 @@ def inline_asm_elementwise(asm: str,
             res_tys = [broadcast_arg.type.with_element_t(dt) for dt in dtype]
     handles = [t.handle for t in dispatch_args]
     builder = _semantic.builder
-    call = builder.create_inline_asm(asm, constraints, handles,
-                                     [ty.to_ir(builder) for ty in res_tys],
-                                     is_pure, pack)
+    call = builder.create_inline_asm(asm, constraints, handles, [ty.to_ir(builder) for ty in res_tys], is_pure, pack)
 
     if not has_multiple_outputs:
         return tensor(call.get_result(0), res_tys[0])
-    return tuple(
-        tensor(call.get_result(i), ty) for i, ty in enumerate(res_tys))
+    return tuple(tensor(call.get_result(i), ty) for i, ty in enumerate(res_tys))
 
 
 # -----------------------------------------------------------------------------
@@ -4274,37 +4053,26 @@ class static_range(_value):
         step: the step value.
     """
 
-    def __init__(self,
-                 arg1: constexpr,
-                 arg2: Optional[constexpr] = None,
-                 step: Optional[constexpr] = None):
-        assert isinstance(
-            arg1, constexpr
-        ), f"{arg1} used as tl.static_range start value is not a constexpr"
+    def __init__(self, arg1: constexpr, arg2: Optional[constexpr] = None, step: Optional[constexpr] = None):
+        assert isinstance(arg1, constexpr), f"{arg1} used as tl.static_range start value is not a constexpr"
         if step is None:
             self.step = CONSTEXPR_1
         else:
-            assert isinstance(
-                step, constexpr
-            ), f"{step} used as tl.static_range step value is not a constexpr"
+            assert isinstance(step, constexpr), f"{step} used as tl.static_range step value is not a constexpr"
             self.step = step
         if arg2 is None:
             self.start = CONSTEXPR_0
             self.end = arg1
         else:
-            assert isinstance(
-                arg2, constexpr
-            ), f"{arg2} used as tl.static_range end value is not a constexpr"
+            assert isinstance(arg2, constexpr), f"{arg2} used as tl.static_range end value is not a constexpr"
             self.start = arg1
             self.end = arg2
 
     def __iter__(self):
-        raise RuntimeError(
-            "static_range can only be used in @tileon.jit'd functions")
+        raise RuntimeError("static_range can only be used in @tileon.jit'd functions")
 
     def __next__(self):
-        raise RuntimeError(
-            "static_range can only be used in @tileon.jit'd functions")
+        raise RuntimeError("static_range can only be used in @tileon.jit'd functions")
 
 
 class range(_value):
@@ -4385,12 +4153,10 @@ class range(_value):
         self.disable_licm = disable_licm
 
     def __iter__(self):
-        raise RuntimeError(
-            "tl.range can only be used in @triton.jit'd functions")
+        raise RuntimeError("tl.range can only be used in @triton.jit'd functions")
 
     def __next__(self):
-        raise RuntimeError(
-            "tl.range can only be used in @triton.jit'd functions")
+        raise RuntimeError("tl.range can only be used in @triton.jit'd functions")
 
 
 class condition(_value):
@@ -4425,9 +4191,8 @@ class condition(_value):
 # -----------------------------------------------------------------------------
 
 
-def dispatch(func: Callable, lib_name: str, lib_path: str, args: list,
-             arg_type_symbol_dict: dict, ret_type: dtype, is_pure: bool,
-             _semantic):
+def dispatch(func: Callable, lib_name: str, lib_path: str, args: list, arg_type_symbol_dict: dict, ret_type: dtype,
+             is_pure: bool, _semantic):
     """
     Dispatch a function to a library.
 
@@ -4461,15 +4226,12 @@ def dispatch(func: Callable, lib_name: str, lib_path: str, args: list,
     arg_types = tuple(arg_types)
 
     if arg_types not in arg_type_symbol_dict:
-        raise ValueError(
-            f"input arg type does not match."
-            f"Expect one of {arg_type_symbol_dict.keys()}, got {arg_types}")
+        raise ValueError(f"input arg type does not match."
+                         f"Expect one of {arg_type_symbol_dict.keys()}, got {arg_types}")
     else:
         symbol = arg_type_symbol_dict[arg_types][0]
         builder = _semantic.builder
-        return tensor(
-            func(lib_name, lib_path, symbol, arg_list, ret_type.to_ir(builder),
-                 is_pure), ret_type)
+        return tensor(func(lib_name, lib_path, symbol, arg_list, ret_type.to_ir(builder), is_pure), ret_type)
 
 
 @builtin
@@ -4510,19 +4272,18 @@ def extern_elementwise(lib_name: str,
         broadcast_arg = dispatch_args[0]
         # Get the broadcast shape over all the arguments
         for item in dispatch_args:
-            _, broadcast_arg = _semantic.binary_op_type_checking_impl(
-                item, broadcast_arg, arithmetic_check=arithmetic_check)
+            _, broadcast_arg = _semantic.binary_op_type_checking_impl(item,
+                                                                      broadcast_arg,
+                                                                      arithmetic_check=arithmetic_check)
         # Change the shape of each argument based on the broadcast shape
         for i in builtins.range(len(dispatch_args)):
-            dispatch_args[i], _ = _semantic.binary_op_type_checking_impl(
-                dispatch_args[i],
-                broadcast_arg,
-                arithmetic_check=arithmetic_check)
+            dispatch_args[i], _ = _semantic.binary_op_type_checking_impl(dispatch_args[i],
+                                                                         broadcast_arg,
+                                                                         arithmetic_check=arithmetic_check)
         if not all_scalar:
             ret_type = broadcast_arg.type.with_element_t(ret_type)
     func = _semantic.builder.create_extern_elementwise
-    return dispatch(func, lib_name, lib_path, dispatch_args,
-                    arg_type_symbol_dict, ret_type, is_pure, _semantic)
+    return dispatch(func, lib_name, lib_path, dispatch_args, arg_type_symbol_dict, ret_type, is_pure, _semantic)
 
 
 def binary_op_type_legalization(lhs, rhs, _semantic):
@@ -4588,21 +4349,14 @@ def builtin_max(*args, propagate_nan=_NOTHING, _semantic=None):
     if propagate_nan is _NOTHING:
         propagate_nan = PropagateNan.NONE
     else:
-        warnings.warn(
-            "passing propagate_nan to `builtin_max` is deprecated, use `tl.minimum` instead"
-        )
+        warnings.warn("passing propagate_nan to `builtin_max` is deprecated, use `tl.minimum` instead")
 
     assert len(args) >= 2, "min requires at least 2 values"
     max_val = args[0]
     for arg in args[1:]:
-        max_val = maximum(max_val,
-                          arg,
-                          propagate_nan=propagate_nan,
-                          _semantic=_semantic)
+        max_val = maximum(max_val, arg, propagate_nan=propagate_nan, _semantic=_semantic)
     if max_val.type.is_block():
-        warnings.warn(
-            "`builtin_max` on non-scalar tensor values is deprecated, use `tl.maximum` instead"
-        )
+        warnings.warn("`builtin_max` on non-scalar tensor values is deprecated, use `tl.maximum` instead")
     return max_val
 
 
@@ -4628,19 +4382,12 @@ def builtin_min(*args, propagate_nan=_NOTHING, _semantic=None):
     if propagate_nan is _NOTHING:
         propagate_nan = PropagateNan.NONE
     else:
-        warnings.warn(
-            "passing propagate_nan to `builtin_min` is deprecated, use `tl.minimum` instead"
-        )
+        warnings.warn("passing propagate_nan to `builtin_min` is deprecated, use `tl.minimum` instead")
 
     assert len(args) >= 2, "min requires at least 2 values"
     min_val = args[0]
     for arg in args[1:]:
-        min_val = minimum(min_val,
-                          arg,
-                          propagate_nan=propagate_nan,
-                          _semantic=_semantic)
+        min_val = minimum(min_val, arg, propagate_nan=propagate_nan, _semantic=_semantic)
     if min_val.type.is_block():
-        warnings.warn(
-            "`builtin_min` on non-scalar tensor values is deprecated, use `tl.minimum` instead"
-        )
+        warnings.warn("`builtin_min` on non-scalar tensor values is deprecated, use `tl.minimum` instead")
     return min_val

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-from typing import Callable, List
+from typing import Callable, List, TYPE_CHECKING
 from .core import _summarize_statistics
+
+if TYPE_CHECKING:
+    import torch
 
 
 def do_bench_cudagraph(fn: Callable,
@@ -119,7 +122,7 @@ def do_bench(fn: Callable,
             fn()
         end = time.perf_counter()
         estimate_ms = (end - start) * 1000 / 5
-        
+
         # compute number of warmup and repeat
         n_warmup = max(1, int(warmup / estimate_ms)) if estimate_ms > 0 else 10
         n_repeat = max(1, int(rep / estimate_ms)) if estimate_ms > 0 else 100
@@ -127,7 +130,7 @@ def do_bench(fn: Callable,
         # Warm-up
         for _ in range(n_warmup):
             fn()
-        
+
         times = []
         # Benchmark
         for _ in range(n_repeat):

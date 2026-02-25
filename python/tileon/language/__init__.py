@@ -284,8 +284,9 @@ __all__ = [
     "tensor",
     "topk",
     "to_tensor",
-    "trans",
+    "transpose",
     "tuple",
+    "tuple_t",
     "uint16",
     "uint32",
     "uint64",
@@ -332,8 +333,6 @@ def str_to_t(name, c):
         if rank_match:
             tensor_rank = int(rank_match.group(1))
             rest = rest[:rank_match.start()] + rest[rank_match.end():]
-        layout_str = rest.lstrip(",")
-        is_gluon = len(layout_str)
         dtype = str_to_t(dtype, None)
         # For im2col with tensor_rank, use it for shape/stride types; otherwise use block_shape ndim
         ndim = tensor_rank if (is_im2col and tensor_rank is not None) else len(block_shape)

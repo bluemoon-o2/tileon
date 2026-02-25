@@ -62,14 +62,12 @@ else:
             message: str,
             /,
             *,
-            category: typing.Optional[
-                typing.Type[Warning]] = DeprecationWarning,
+            category: typing.Optional[typing.Type[Warning]] = DeprecationWarning,
             stacklevel: int = 1,
         ):
             if not isinstance(message, str):
-                raise TypeError(
-                    "Expected an object of type str for 'message', not "
-                    f"{type(message).__name__!r}")
+                raise TypeError("Expected an object of type str for 'message', not "
+                                f"{type(message).__name__!r}")
             self.message = message
             self.category = category
             self.stacklevel = stacklevel
@@ -91,9 +89,7 @@ else:
                 @functools.wraps(original_new)
                 def __new__(cls, /, *args, **kwargs):
                     if cls is arg:
-                        warnings.warn(msg,
-                                      category=category,
-                                      stacklevel=stacklevel + 1)
+                        warnings.warn(msg, category=category, stacklevel=stacklevel + 1)
                     if original_new is not object.__new__:
                         return original_new(cls, *args, **kwargs)
                     # Mirrors a similar check in object.__new__.
@@ -112,9 +108,7 @@ else:
 
                     @functools.wraps(original_init_subclass)
                     def __init_subclass__(*args, **kwargs):
-                        warnings.warn(msg,
-                                      category=category,
-                                      stacklevel=stacklevel + 1)
+                        warnings.warn(msg, category=category, stacklevel=stacklevel + 1)
                         return original_init_subclass(*args, **kwargs)
 
                     arg.__init_subclass__ = classmethod(__init_subclass__)
@@ -124,9 +118,7 @@ else:
 
                     @functools.wraps(original_init_subclass)
                     def __init_subclass__(*args, **kwargs):
-                        warnings.warn(msg,
-                                      category=category,
-                                      stacklevel=stacklevel + 1)
+                        warnings.warn(msg, category=category, stacklevel=stacklevel + 1)
                         return original_init_subclass(*args, **kwargs)
 
                     arg.__init_subclass__ = __init_subclass__
@@ -140,9 +132,7 @@ else:
 
                 @functools.wraps(arg)
                 def wrapper(*args, **kwargs):
-                    warnings.warn(msg,
-                                  category=category,
-                                  stacklevel=stacklevel + 1)
+                    warnings.warn(msg, category=category, stacklevel=stacklevel + 1)
                     return arg(*args, **kwargs)
 
                 if inspect.iscoroutinefunction(arg):
@@ -155,22 +145,19 @@ else:
                 arg.__deprecated__ = wrapper.__deprecated__ = msg
                 return wrapper
             else:
-                raise TypeError(
-                    "@deprecated decorator with non-None category must be applied to "
-                    f"a class or callable, not {arg!r}")
+                raise TypeError("@deprecated decorator with non-None category must be applied to "
+                                f"a class or callable, not {arg!r}")
 
 
 if typing.TYPE_CHECKING:
     from .language import core
-    IterableType = typing.Union[list[typing.Any], tuple[typing.Any, ...],
-                                core.tuple, core.tuple_t]
+    IterableType = typing.Union[list[typing.Any], tuple[typing.Any, ...], core.tuple, core.tuple_t]
     ObjPath = typing.Tuple[int, ...]
 
 TILEON_MAX_TENSOR_NUMEL = 1048576
 
 
-def tuple_create(x: typing.Union[typing.Tuple, typing.NamedTuple],
-                 dtype: type):
+def tuple_create(x: typing.Union[typing.Tuple, typing.NamedTuple], dtype: type):
     """
     Creates a tuple of dtype from x.
 
@@ -202,8 +189,7 @@ def get_iterable_path(iterable: IterableType, path: ObjPath):
 def set_iterable_path(iterable: IterableType, path: ObjPath, val: typing.Any):
     from .language import core
     assert len(path) != 0
-    prev = iterable if len(path) == 1 else get_iterable_path(
-        iterable, path[:-1])
+    prev = iterable if len(path) == 1 else get_iterable_path(iterable, path[:-1])
     assert isinstance(prev, core.tuple)
     prev._setitem(path[-1], val)
 
@@ -222,9 +208,7 @@ def is_iterable(x):
     return isinstance(x, (list, tuple, core.tuple, core.tuple_t))
 
 
-def apply_with_path(value,
-                    fn: typing.Callable[[ObjPath, typing.Any], None],
-                    _path=None) -> None:
+def apply_with_path(value, fn: typing.Callable[[ObjPath, typing.Any], None], _path=None) -> None:
     if _path is None:
         _path = ()
 
@@ -235,9 +219,8 @@ def apply_with_path(value,
         fn(_path, value)
 
 
-def find_paths_if(
-        iterable: typing.Union[IterableType, typing.Any],
-        pred: typing.Callable[[ObjPath, typing.Any], bool]) -> list[ObjPath]:
+def find_paths_if(iterable: typing.Union[IterableType, typing.Any], pred: typing.Callable[[ObjPath, typing.Any],
+                                                                                          bool]) -> list[ObjPath]:
     """
     Finds all paths in the iterable that satisfy the given predicate.
 
@@ -288,17 +271,13 @@ def validate_block_shape(shape: typing.Sequence[int]):
     numel = 1
     for i, d in enumerate(shape):
         if not isinstance(d, int):
-            raise TypeError(
-                f"Shape element {i} must have type `constexpr(int)`, got `constexpr({type(d)})`"
-            )
+            raise TypeError(f"Shape element {i} must have type `constexpr(int)`, got `constexpr({type(d)})`")
         if not is_power_of_two(d):
             raise ValueError(f"Shape element {i} must be a power of 2")
         numel *= d
 
     if numel > TILEON_MAX_TENSOR_NUMEL:
-        raise ValueError(
-            f"numel ({numel}) exceeds tileon maximum tensor numel ({TILEON_MAX_TENSOR_NUMEL})"
-        )
+        raise ValueError(f"numel ({numel}) exceeds tileon maximum tensor numel ({TILEON_MAX_TENSOR_NUMEL})")
     return numel
 
 
@@ -391,8 +370,7 @@ def is_namedtuple(val):
     Returns:
         True if val is a namedtuple.
     """
-    return isinstance(val, type) and issubclass(val, tuple) and hasattr(
-        val, "_fields")
+    return isinstance(val, type) and issubclass(val, tuple) and hasattr(val, "_fields")
 
 
 def convert_to_tuple_if_list(item):

@@ -83,3 +83,12 @@ write_to = "python/tileon/_version.py"
 version_scheme = "release-branch-semver"
 local_scheme = "no-local-version"
 fallback_version = "0.0.1.dev0"
+
+[tool.ruff]
+line-length = 120
+lint.ignore = ["E731"]
+
+[tool.yapf]
+based_on_style = "pep8"
+column_limit = 120
+indent_width = 4

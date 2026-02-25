@@ -10,15 +10,7 @@ N_ROUNDS_DEFAULT = tl.constexpr(10)
 
 
 @jit
-def philox_impl(
-    c0,
-    c1,
-    c2,
-    c3,
-    k0,
-    k1,
-    n_rounds: tl.constexpr = N_ROUNDS_DEFAULT
-):
+def philox_impl(c0, c1, c2, c3, k0, k1, n_rounds: tl.constexpr = N_ROUNDS_DEFAULT):
     """
     Run `n_rounds` rounds of Philox for state (c0, c1, c2, c3) and key (k0, k1).
     """
@@ -68,10 +60,7 @@ def philox(seed, c0, c1, c2, c3, n_rounds: tl.constexpr = N_ROUNDS_DEFAULT):
         seed_hi = ((seed >> 32) & 0xffffffff).to(tl.uint32)
         seed_lo = (seed & 0xffffffff).to(tl.uint32)
     else:
-        tl.static_assert(
-            tl.constexpr(c0.dtype.primitive_bitwidth) == 64,
-            "bitwidth not supported in philox"
-        )
+        tl.static_assert(tl.constexpr(c0.dtype.primitive_bitwidth) == 64, "bitwidth not supported in philox")
         int_dtype = tl.uint64
         seed_hi = tl.full((1, ), 0, dtype=int_dtype)
         seed_lo = seed
@@ -152,9 +141,7 @@ def uint_to_uniform_float(x):
         x = x.to(tl.int32, bitcast=True)
         scale = 4.6566127342e-10
     else:
-        tl.static_assert(
-            tl.constexpr(x.dtype == tl.uint64)
-            or tl.constexpr(x.dtype == tl.int64))
+        tl.static_assert(tl.constexpr(x.dtype == tl.uint64) or tl.constexpr(x.dtype == tl.int64))
         x = x.to(tl.int64, bitcast=True)
         scale = 1.0842020432385337e-19
     x = tl.where(x < 0, -x - 1, x)

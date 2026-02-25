@@ -9,7 +9,6 @@ from tileon._C import getenv, getenv_bool
 if TYPE_CHECKING:
     from .runtime.cache import CacheManager, RemoteCacheBackend
 
-
 PROPAGATE_ENV: bool = True
 
 
@@ -77,8 +76,7 @@ class EnvVar(Generic[SetType, GetType]):
     def __set_name__(self, objclass: Type[object], name: str) -> None:
         self.name = name
 
-    def __get__(self, obj: Optional[object],
-                objclass: Optional[Type[object]]) -> GetType:
+    def __get__(self, obj: Optional[object], objclass: Optional[Type[object]]) -> GetType:
         py_val = obj.__dict__.get(self.name, _NOTHING)
         if py_val is _NOTHING:
             return self.get()
@@ -153,8 +151,7 @@ class EnvInt(EnvVar[int, int]):
         try:
             return int(val)
         except ValueError as e:
-            raise RuntimeError(
-                f"Unable to use {self.key}={val}: expected int") from e
+            raise RuntimeError(f"Unable to use {self.key}={val}: expected int") from e
 
 
 class EnvOptStr(EnvVar[Optional[str], Optional[str]]):
@@ -214,10 +211,7 @@ class Knobs:
         try:
             return cls.__knob_descriptors_cache  # type: ignore[attr-defined]
         except AttributeError:
-            result = {
-                k: v
-                for k, v in cls.__dict__.items() if isinstance(v, EnvVar)
-            }
+            result = {k: v for k, v in cls.__dict__.items() if isinstance(v, EnvVar)}
             cls.__knob_descriptors_cache = result  # type: ignore[attr-defined]
             return result
 
@@ -250,10 +244,7 @@ class Knobs:
         Set the knobs to the current values of the environment variables.
         """
         try:
-            initial_env = {
-                knob.key: getenv(knob.key)
-                for knob in self.descriptors.values()
-            }
+            initial_env = {knob.key: getenv(knob.key) for knob in self.descriptors.values()}
             orig = dict(self.__dict__)
             yield
         finally:
@@ -297,6 +288,7 @@ class cache_knobs(Knobs):
 runtime = RuntimeKnobs()
 language = LanguageKnobs()
 cache = cache_knobs()
+
 
 def refresh_knobs():
     """

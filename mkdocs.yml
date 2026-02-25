@@ -1,4 +1,4 @@
-site_name: tileon
+site_name: Tileon
 site_url: https://bluemoon-o2.github.io/tileon/
 repo_url: https://github.com/bluemoon-o2/tileon
 
@@ -12,12 +12,10 @@ theme:
     - navigation.path
     - navigation.sections
     - navigation.tabs
-
     - navigation.prune
     - navigation.top
 
   palette:
-
     # Palette toggle for light mode
     - scheme: default
       primary: indigo
@@ -35,6 +33,8 @@ theme:
 plugins:
   - search
   - i18n:
+      docs_structure: folder
+      fallback_to_default: true
       languages:
         - locale: en
           default: true
@@ -45,6 +45,10 @@ plugins:
           build: true
           nav_translations:
             "Getting Started": "快速开始"
+            "Programming Guide": "编程指南"
+            "Python API": "Python API"
+            "Contributing": "贡献指南"
+            "License": "许可协议"
 
   - mkdocstrings:
       handlers:
@@ -64,11 +68,28 @@ plugins:
 watch:
   - python/tileon
   - README.md
+  - docs
 
 nav:
-  - "Getting Started": "index.md"
-
-
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Tutorials:
+      - Overview: getting-started/tutorials/index.md
+      - Vector Add: getting-started/tutorials/vector-add.md
+      - Matrix Multiplication: getting-started/tutorials/matrix-multiplication.md
+  - Programming Guide:
+    - Introduction: programming-guide/chapter-1/introduction.md
+    - Basics: programming-guide/chapter-2/basics.md
+    - Advanced: programming-guide/chapter-3/advanced.md
+  - Python API:
+    - tileon: python-api/tileon.md
+    - tileon.language: python-api/tileon.language.md
+    - tileon.language.math: python-api/tileon.language.math.md
+    - tileon.language.random: python-api/tileon.language.random.md
+    - tileon.testing: python-api/tileon.testing.md
+  - Contributing: CONTRIBUTING.md
+  - License: LICENSE.md
 
 extra_css:
   - stylesheets/extra.css
@@ -98,23 +119,3 @@ markdown_extensions:
 copyright: >
   Copyright &copy; 2026 Tileon Team -
   <a href="#__consent">Change cookie settings</a>
-
-extra:
-  alternate:
-    - name: English
-      link: /tileon/
-      lang: en
-    - name: 中文
-      link: /tileon/zh/
-      lang: zh
-  consent:
-    title: Cookie consent
-    description: >-
-      We use cookies to recognize your repeated visits and preferences, as well
-      as to measure the effectiveness of our documentation and whether users
-      find what they're searching for. With your consent, you're helping us to
-      make our documentation better.
-    actions:
-      - accept
-      - reject
-      - manage

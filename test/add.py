@@ -22,11 +22,12 @@ import tileon.language as tl
 
 DEVICE = torch.device("cpu")
 
+
 @tileon.jit
 def add_kernel(
     x_ptr,
     y_ptr,
-    output_ptr, 
+    output_ptr,
     n_elements,
     BLOCK_SIZE: tl.constexpr,
 ):
@@ -67,14 +68,13 @@ print(f'The maximum difference between torch and triton is '
         x_vals=[2**i for i in range(12, 16, 1)] if tileon.knobs.runtime.interpret else [2**i for i in range(12, 28, 1)],
         x_log=True,
         line_arg='provider',
-        line_vals=['tileon', 'torch', 'numpy'], 
+        line_vals=['tileon', 'torch', 'numpy'],
         line_names=['Tileon', 'Torch', 'NumPy'],
         styles=[('blue', '-'), ('green', '-'), ('red', '-')],
         ylabel='GB/s',
         plot_name='vector-add-performance',
         args={},
-    )
-)
+    ))
 def benchmark(size, provider):
     x = torch.rand(size, device=DEVICE, dtype=torch.float32)
     y = torch.rand(size, device=DEVICE, dtype=torch.float32)

@@ -24,16 +24,14 @@ class Config:
         ir_override: filename of a user-defined IR (*.{ttgir|llir|ptx|amdgcn}).
     """
 
-    def __init__(
-        self,
-        kwargs,
-        num_warps: int = 4,
-        num_stages: int = 3,
-        num_ctas: int = 1,
-        maxnreg: int = None,
-        pre_hook: Callable = None,
-        ir_override=None
-    ):
+    def __init__(self,
+                 kwargs,
+                 num_warps: int = 4,
+                 num_stages: int = 3,
+                 num_ctas: int = 1,
+                 maxnreg: int = None,
+                 pre_hook: Callable = None,
+                 ir_override=None):
         self.kwargs = kwargs
         self.num_warps = num_warps
         self.num_ctas = num_ctas
@@ -124,7 +122,7 @@ def heuristics(values):
         @tileon.jit
         def kernel(x_ptr, x_size, BLOCK_SIZE: tl.constexpr):
             ...
-    
+
     Args:
         values: a dictionary of meta-parameter names and functions that compute the value of the meta-parameter.
                each such function takes a list of positional arguments as input.

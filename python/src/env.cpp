@@ -1,11 +1,11 @@
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
 #include <cstring>
 #include <map>
 #include <optional>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 #include <set>
 #include <string>
 
@@ -15,10 +15,12 @@ using namespace pybind11::literals;
 namespace Env {
 
 // Helper function to check if a string is truthy
-// Returns true if the string is "1", "y", "on", "yes", or "true" (case-insensitive)
+// Returns true if the string is "1", "y", "on", "yes", or "true"
+// (case-insensitive)
 bool is_truthy(const char *str) {
-  if (!str) return false;
-  
+  if (!str)
+    return false;
+
   std::string s(str);
   std::transform(s.begin(), s.end(), s.begin(),
                  [](unsigned char c) { return std::tolower(c); });
@@ -28,7 +30,8 @@ bool is_truthy(const char *str) {
 
 // Get an environment variable
 // If the variable is not set, return the default value (None by default)
-py::object getenv(const std::string &name, py::object default_val = py::none()) {
+py::object getenv(const std::string &name,
+                  py::object default_val = py::none()) {
   const char *env_val = std::getenv(name.c_str());
   if (!env_val) {
     return default_val;
@@ -94,7 +97,7 @@ std::map<std::string, std::string> get_cache_invalidating_env_vars() {
   static bool initialized = false;
 
   if (initialized) {
-     return cache;
+    return cache;
   }
 
   for (const auto &envVar : CACHE_INVALIDATING_ENV_VARS) {
@@ -109,7 +112,7 @@ std::map<std::string, std::string> get_cache_invalidating_env_vars() {
     std::string lowerStr = strVal;
     std::transform(lowerStr.begin(), lowerStr.end(), lowerStr.begin(),
                    [](unsigned char c) { return std::tolower(c); });
-    
+
     if (lowerStr == "on" || lowerStr == "true" || lowerStr == "1")
       cache[envVar] = "true";
     else if (lowerStr == "off" || lowerStr == "false" || lowerStr == "0")
@@ -127,7 +130,7 @@ using namespace Env;
 
 void init_env(py::module_ &m) {
   // Bind env var functions with detailed documentation
-  
+
   m.def("getenv", &Env::getenv, "name"_a, "default_val"_a = py::none(),
         R"pbdoc(
     Get an environment variable.
@@ -153,7 +156,8 @@ void init_env(py::module_ &m) {
                         False if it is set to a falsy value, or default_val if not set.
     )pbdoc");
 
-  m.def("get_cache_invalidating_env_vars", &Env::get_cache_invalidating_env_vars,
+  m.def("get_cache_invalidating_env_vars",
+        &Env::get_cache_invalidating_env_vars,
         R"pbdoc(
     Get a dictionary of environment variables that affect compilation cache.
 

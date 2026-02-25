@@ -9,7 +9,8 @@ from typing import Optional, Set, Union
 import pytest
 
 from numpy.random import RandomState
-from tileon.runtime.jit import TensorWrapper, reinterpret, type_canonicalisation_dict
+from tileon.runtime.jit import reinterpret, TileonTensor
+from ._utils import type_canonicalisation_dict
 
 int_dtypes = ['int8', 'int16', 'int32', 'int64']
 uint_dtypes = ['uint8', 'uint16', 'uint32', 'uint64']
@@ -25,7 +26,8 @@ tma_dtypes = sorted(set(dtypes_with_bfloat16) - {"int64", "uint64", "float64"})
 
 def is_interpreter():
     """Check if the interpreter is enabled."""
-    return os.environ.get('TILEON_INTERPRET', '0') == '1'
+    import tileon.knobs
+    return tileon.knobs.runtime.interpret
 
 
 def get_current_target():
@@ -157,8 +159,7 @@ def numpy_random(shape: Union[int, tuple[int, ...]],
         high = iinfo.max if high is None else min(high, iinfo.max)
         dtype = getattr(np, dtype_str)
         x = random_state.randint(low, high, shape, dtype=dtype)
-        x[x ==
-          0] = 1  # Workaround. Never return zero so tests of division don't error out.
+        x[x == 0] = 1  # Workaround. Never return zero so tests of division don't error out.
         return x
     elif dtype_str and 'float8' in dtype_str:
         x = random_state.randint(20, 40, shape, dtype=np.int8)
@@ -166,18 +167,15 @@ def numpy_random(shape: Union[int, tuple[int, ...]],
     elif dtype_str in float_dtypes:
         return random_state.normal(0, 1, shape).astype(dtype_str)
     elif dtype_str == 'bfloat16':
-        return (
-            random_state.normal(0, 1, shape).astype('float32').view('uint32')
-            & np.uint32(0xffff0000)).view('float32')
+        return (random_state.normal(0, 1, shape).astype('float32').view('uint32')
+                & np.uint32(0xffff0000)).view('float32')
     elif dtype_str in ['bool', 'int1', 'bool_']:
         return random_state.normal(0, 1, shape) > 0.0
     else:
         raise RuntimeError(f'Unknown dtype {dtype_str}')
 
 
-def to_tileon(x: np.ndarray,
-              device: torch.device,
-              dst_type=None) -> Union[TensorWrapper, torch.Tensor]:
+def to_tileon(x: np.ndarray, device: torch.device, dst_type=None) -> Union[TileonTensor, torch.Tensor]:
     '''
     Note: We need dst_type because the type of x can be different from dst_type.
           For example: x is of type `float32`, dst_type is `bfloat16`.
@@ -187,12 +185,10 @@ def to_tileon(x: np.ndarray,
     if t in uint_dtypes:
         signed_type_name = t.lstrip('u')  # e.g. "uint16" -> "int16"
         x_signed = x.astype(getattr(np, signed_type_name))
-        return reinterpret(torch.tensor(x_signed, device=device),
-                           getattr(tl, t))
+        return reinterpret(torch.tensor(x_signed, device=device), getattr(tl, t))
     else:
         if dst_type and 'float8' in dst_type:
-            return reinterpret(torch.tensor(x, device=device),
-                               getattr(tl, dst_type))
+            return reinterpret(torch.tensor(x, device=device), getattr(tl, dst_type))
         if t == 'float32' and dst_type == 'bfloat16':
             return torch.tensor(x, device=device).bfloat16()
         return torch.tensor(x, device=device)
@@ -217,9 +213,8 @@ def torch_dtype_name(dtype: Union[tileon.language.dtype, torch.dtype]) -> str:
 
 def to_numpy(x):
     """Convert a tileon-compatible tensor to a numpy array."""
-    if isinstance(x, TensorWrapper):
-        return x.base.cpu().numpy().astype(
-            getattr(np, torch_dtype_name(x.dtype)))
+    if isinstance(x, TileonTensor):
+        return x.base.cpu().numpy().astype(getattr(np, torch_dtype_name(x.dtype)))
     elif isinstance(x, torch.Tensor):
         if x.dtype is torch.bfloat16:
             return x.cpu().float().numpy()
@@ -238,8 +233,7 @@ def supports_tma(byval_only=False):
     min_cuda_version = (12, 0) if byval_only else (12, 3)
     cuda_version_tuple = tuple(map(int, cuda_version.split(".")))
     assert len(cuda_version_tuple) == 2, cuda_version_tuple
-    return torch.cuda.get_device_capability(
-    )[0] >= 9 and cuda_version_tuple >= min_cuda_version
+    return torch.cuda.get_device_capability()[0] >= 9 and cuda_version_tuple >= min_cuda_version
 
 
 def supports_ws():
@@ -265,10 +259,8 @@ def default_alloc_fn(size: int, align: int, _):
     return torch.empty(size, dtype=torch.int8, device="cuda")
 
 
-def unwrap_tensor(
-        t: Union[torch.Tensor,
-                 tileon.runtime.jit.TensorWrapper]) -> torch.Tensor:
-    if isinstance(t, tileon.runtime.jit.TensorWrapper):
+def unwrap_tensor(t: Union[torch.Tensor, TileonTensor]) -> torch.Tensor:
+    if isinstance(t, TileonTensor):
         return t.base
     return t
 
@@ -284,15 +276,14 @@ def _fresh_knobs_impl(skipped_attr: Optional[Set[str]] = None):
     knobs_map = {
         name: knobset
         for name, knobset in knobs.__dict__.items()
-        if isinstance(knobset, knobs.base_knobs)
-        and knobset != knobs.base_knobs and name not in skipped_attr
+        if isinstance(knobset, knobs.base_knobs) and knobset != knobs.base_knobs and name not in skipped_attr
     }
 
     # We store which variables we need to unset below in finally because
     # monkeypatch doesn't appear to reset variables that were never set
     # before the monkeypatch.delenv call below.
     env_to_unset = []
-    prev_propagate_env = knobs.propagate_env
+    prev_propagate_env = knobs.PROPAGATE_ENV
 
     def fresh_function():
         nonlocal env_to_unset
@@ -303,7 +294,7 @@ def _fresh_knobs_impl(skipped_attr: Optional[Set[str]] = None):
                     monkeypatch.delenv(knob.key, raising=False)
                 else:
                     env_to_unset.append(knob.key)
-        knobs.propagate_env = True
+        knobs.PROPAGATE_ENV = True
         return knobs
 
     def reset_function():
