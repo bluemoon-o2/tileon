@@ -3,7 +3,7 @@ include(${PROJECT_SOURCE_DIR}/unittest/googletest.cmake)
 include(GoogleTest)
 enable_testing()
 
-function(add_tileon_ut)
+function(add_unittest)
   set(options)
   set(oneValueArgs NAME)
   set(multiValueArgs SRCS LIBS DEFS)
@@ -25,5 +25,5 @@ function(add_tileon_ut)
   gtest_discover_tests(${__NAME} DISCOVERY_TIMEOUT 60)
 
   # Add the unit test to the top-level unit test target.
-  add_dependencies(TileonUnitTests ${__NAME})
+  add_dependencies(UnitTests ${__NAME})
 endfunction()

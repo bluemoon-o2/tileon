@@ -246,7 +246,7 @@ def max(
     return_indices_tie_break_left=True,
     keep_dims=False
 ):
-    input = core._promote_bfloat16_to_float32(input)
+    input = core._promote_bf16_to_f32(input)
     if return_indices:
         if return_indices_tie_break_left:
             return core._reduce_with_indices(
@@ -334,7 +334,7 @@ def min(
     return_indices_tie_break_left=True,
     keep_dims=False
 ):
-    input = core._promote_bfloat16_to_float32(input)
+    input = core._promote_bf16_to_f32(input)
     if return_indices:
         if return_indices_tie_break_left:
             return core._reduce_with_indices(
@@ -454,7 +454,7 @@ def reduce_or(input, axis, keep_dims=False):
 def cumsum(input, axis=0, reverse=False, dtype: core.constexpr = None):
     # todo rename this to a generic function name
 
-    input = core._promote_bfloat16_to_float32(input)
+    input = core._promote_bf16_to_f32(input)
     out_dtype: core.constexpr = _pick_sum_dtype(input.dtype, dtype)
 
     if out_dtype is not None:
@@ -481,7 +481,7 @@ def _prod_combine(a, b):
 @core.add_scan_docstr("cumprod")
 def cumprod(input, axis=0, reverse=False):
     # todo rename this to a generic function name
-    input = core._promote_bfloat16_to_float32(input)
+    input = core._promote_bf16_to_f32(input)
     return core.associative_scan(input, axis, _prod_combine, reverse)
 
 

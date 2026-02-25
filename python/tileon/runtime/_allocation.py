@@ -21,13 +21,13 @@ class NullAllocator:
                  stream: Optional[int]) -> Buffer:
         raise RuntimeError(
             "Kernel requires a runtime memory allocation, but no allocator was set. "
-            + "Use triton.set_allocator to specify an allocator.")
+            + "Use tileon.set_allocator to specify an allocator."
+        )
 
 
 _NULL_ALLOCATOR = NullAllocator()
 
-_allocator: ContextVar[Allocator] = ContextVar("_allocator",
-                                               default=_NULL_ALLOCATOR)
+_allocator: ContextVar[Allocator] = ContextVar("_allocator", default=_NULL_ALLOCATOR)
 
 
 def set_allocator(allocator: Allocator) -> None:
@@ -53,8 +53,7 @@ class _AllocatorWrapper:
     def set(self, allocator: Allocator) -> None:
         self._allocator = allocator
 
-    def __call__(self, size: int, alignment: int,
-                 stream: Optional[int]) -> Buffer:
+    def __call__(self, size: int, alignment: int, stream: Optional[int]) -> Buffer:
         return self._allocator(size, alignment, stream)
 
 

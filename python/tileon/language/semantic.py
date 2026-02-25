@@ -845,7 +845,7 @@ class TileonSemantic(Generic[Tensor_t]):
             )
 
         ret_type = tl.block_t(input.type.scalar, [input.shape[d] for d in dims])
-        return self.tensor(self.builder.create_trans(input.handle, dims), ret_type)
+        return self.tensor(self.builder.create_transpose(input.handle, dims), ret_type)
 
     def broadcast_impl_shape(self, input: Tensor_t, shape: Tuple[int]) -> Tensor_t:
         if not input.type.is_block():
@@ -1475,7 +1475,7 @@ class TileonSemantic(Generic[Tensor_t]):
         assert desc.block_shape[
             1] >= min_cols, f"descriptor gather of {dtype} must have at least {min_cols} columns, but got {desc.block_shape[1]}"
 
-        type = tl.block_type(desc.dtype,
+        type = tl.block_t(desc.dtype,
                              [x_offsets.shape[0], desc.block_shape[1]])
         y_offset = self._convert_to_ir_values((y_offset, ),
                                               require_i64=False)[0]
@@ -1925,7 +1925,7 @@ class TileonSemantic(Generic[Tensor_t]):
         N = rhs.type.shape[-1]
         K = lhs.type.shape[-1]
         B = lhs.type.shape[0] if lhs_rank == 3 else None
-        ret_ty = tl.block_type(ret_scalar_ty, [B, M, N] if B else [M, N])
+        ret_ty = tl.block_t(ret_scalar_ty, [B, M, N] if B else [M, N])
         if acc is None:
             acc_handle = self.builder.create_splat(ret_ty.to_ir(self.builder),
                                                    _0)
@@ -2040,7 +2040,7 @@ class TileonSemantic(Generic[Tensor_t]):
             K = K * PACKED_A
         if not rhs_k_pack:
             N = N * PACKED_B
-        ret_ty = tl.block_type(out_dtype, [B, M, N] if B else [M, N])
+        ret_ty = tl.block_t(out_dtype, [B, M, N] if B else [M, N])
         _0 = self.builder.get_fp32(0)
         if acc is None:
             acc_handle = self.builder.create_splat(ret_ty.to_ir(self.builder),
@@ -2089,7 +2089,7 @@ class TileonSemantic(Generic[Tensor_t]):
 
     def wrap_tensor(self, x, scalar_ty, ret_shape):
         if ret_shape:
-            res_ty = tl.block_type(scalar_ty, ret_shape)
+            res_ty = tl.block_t(scalar_ty, ret_shape)
         else:
             # 0d-tensor -> scalar
             res_ty = scalar_ty
@@ -2224,7 +2224,7 @@ class TileonSemantic(Generic[Tensor_t]):
             mask = mask.handle
         return self.tensor(
             self.builder.create_histogram(input.handle, num_bins, mask),
-            tl.block_type(tl.int32, [num_bins]))
+            tl.block_t(tl.int32, [num_bins]))
 
     def multiple_of(self, x: TensorTy, values: List[int]) -> TensorTy:
         if max(1, len(x.shape)) != len(values):
@@ -2269,9 +2269,7 @@ class TileonSemantic(Generic[Tensor_t]):
 
         new_args = [arg.handle for arg in args]
         is_signed = [arg.dtype.is_int_signed() for arg in args]
-        return self.tensor(
-            self.builder.create_print(prefix, hex, new_args, is_signed),
-            tl.void)
+        return self.tensor(self.builder.create_print(prefix, hex, new_args, is_signed), tl.void)
 
     def device_assert(self, cond: TensorTy, msg: str,
                       mask: Optional[TensorTy]) -> TensorTy:
@@ -2373,7 +2371,7 @@ class TileonSemantic(Generic[Tensor_t]):
                                                     block_shape, order)
         return self.tensor(
             handle,
-            tl.pointer_type(tl.block_type(base.type.element_t, block_shape)))
+            tl.pointer_type(tl.block_t(base.type.element_t, block_shape)))
 
     def advance(self, base: TensorTy, offsets) -> TensorTy:
         # Convert dynamic offsets to IR values
@@ -2423,7 +2421,7 @@ class TileonSemantic(Generic[Tensor_t]):
         block_shape = tl._unwrap_shape(block_shape)
 
         assert isinstance(base.type, tl.pointer_type)
-        type = tl.block_type(base.type.element_t, block_shape)
+        type = tl.block_t(base.type.element_t, block_shape)
         base_handle = base.handle
         is_signed_int = base.type.element_t.is_int_signed()
 

@@ -12,6 +12,11 @@ from tileon import __version__, knobs
 
 
 class CacheManager(ABC):
+    """
+    Base class for cache managers.
+
+    A cache manager is responsible for storing and retrieving data from a cache.
+    """
 
     def __init__(self, key, override=False, dump=False):
         pass
@@ -34,6 +39,14 @@ class CacheManager(ABC):
 
 
 class FileCacheManager(CacheManager):
+    """
+    Cache manager that stores data in files.
+
+    The cache is stored in a directory specified by the key. If the dump flag is set,
+    the cache is stored in the dump directory. If the override flag is set, the cache
+    is stored in the override directory. Otherwise, the cache is stored in the default
+    cache directory.
+    """
 
     def __init__(self, key, override=False, dump=False):
         self.key = key
@@ -71,6 +84,12 @@ class FileCacheManager(CacheManager):
             return None
 
     def get_group(self, filename: str) -> Optional[Dict[str, str]]:
+        """
+        Get a group of files from the cache.
+
+        A group is a dictionary of filename to filepath. The filepath is the path to
+        the cached file. If the group does not exist, None is returned.
+        """
         grp_filename = f"__grp__{filename}"
         if not self.has_file(grp_filename):
             return None
@@ -91,8 +110,14 @@ class FileCacheManager(CacheManager):
                 result[c] = p
         return result
 
-    # Note a group of pushed files as being part of a group
     def put_group(self, filename: str, group: Dict[str, str]) -> str:
+        """
+        Add a group of files to the cache.
+
+        A group is a dictionary of filename to filepath. The filepath is the path to
+        the cached file. The group is stored in a file with the filename prefixed
+        with "__grp__".
+        """
         if not self.cache_dir:
             raise RuntimeError("Could not create or locate cache dir")
         grp_contents = json.dumps({"child_paths": group})
@@ -100,6 +125,12 @@ class FileCacheManager(CacheManager):
         return self.put(grp_contents, grp_filename, binary=False)
 
     def put(self, data, filename, binary=True) -> str:
+        """
+        Add a file to the cache.
+
+        The file is stored in a file with the filename. If the binary flag is set,
+        the file is stored as binary. Otherwise, the file is stored as text.
+        """
         if not self.cache_dir:
             raise RuntimeError("Could not create or locate cache dir")
         binary = isinstance(data, bytes)
@@ -170,6 +201,14 @@ class RedisRemoteCacheBackend(RemoteCacheBackend):
 
 
 class RemoteCacheManager(CacheManager):
+    """
+    Cache manager that stores data in a remote/distributed cache.
+
+    The cache is stored in a Redis instance specified by the key. If the dump flag is set,
+    the cache is stored in the dump directory. If the override flag is set, the cache
+    is stored in the override directory. Otherwise, the cache is stored in the default
+    cache directory.
+    """
 
     def __init__(self, key, override=False, dump=False):
         # Setup backend pointed too by `TRITON_REMOTE_CACHE_BACKEND`.
@@ -191,6 +230,11 @@ class RemoteCacheManager(CacheManager):
         return self._file_cache_manager.put(data, filename, binary=True)
 
     def get_file(self, filename: str) -> Optional[str]:
+        """
+        Get a file from the cache.
+
+        If the file is not in the cache, None is returned.
+        """
         # We don't handle the dump/override cases.
         if self._dump or self._override:
             return self._file_cache_manager.get_file(filename)
@@ -205,6 +249,12 @@ class RemoteCacheManager(CacheManager):
         return self._materialize(filename, data)
 
     def put(self, data, filename: str, binary=True) -> str:
+        """
+        Add a file to the cache.
+
+        The file is stored in a file with the filename. If the binary flag is set,
+        the file is stored as binary. Otherwise, the file is stored as text.
+        """
         # We don't handle the dump/override cases.
         if self._dump or self._override:
             return self._file_cache_manager.put(data, filename, binary=binary)
@@ -215,6 +265,11 @@ class RemoteCacheManager(CacheManager):
         return self._materialize(filename, data)
 
     def get_group(self, filename: str) -> Optional[Dict[str, str]]:
+        """
+        Get a group of files from the cache.
+
+        If the group is not in the cache, None is returned.
+        """
         # We don't handle the dump/override cases.
         if self._dump or self._override:
             return self._file_cache_manager.get_group(filename)
@@ -232,8 +287,6 @@ class RemoteCacheManager(CacheManager):
         child_paths = grp_data.get("child_paths", None)
 
         result = None
-
-        # Found group data.
         if child_paths is not None:
             result = {}
             for child_path, data in self._backend.get(child_paths).items():
@@ -241,7 +294,13 @@ class RemoteCacheManager(CacheManager):
 
         return result
 
-    def put_group(self, filename: str, group: Dict[str, str]):
+    def put_group(self, filename: str, group: Dict[str, str]) -> str:
+        """
+        Add a group of files to the cache.
+
+        The group is stored in a file with the filename. The group is a dictionary
+        of filenames to file contents.
+        """
         # We don't handle the dump/override cases.
         if self._dump or self._override:
             return self._file_cache_manager.put_group(filename, group)
@@ -252,26 +311,40 @@ class RemoteCacheManager(CacheManager):
 
 
 def _base32(key):
-    # Assume key is a hex string.
+    """
+    Convert a hex string to a base32 string.
+    """
     return base64.b32encode(bytes.fromhex(key)).decode("utf-8").rstrip("=")
 
 
 def get_cache_manager(key) -> CacheManager:
+    """
+    Get a cache manager for the given key.
+    """
     cls = knobs.cache.manager_class or FileCacheManager
     return cls(_base32(key))
 
 
 def get_override_manager(key) -> CacheManager:
+    """
+    Get a cache manager for the given key with override enabled.
+    """
     cls = knobs.cache.manager_class or FileCacheManager
     return cls(_base32(key), override=True)
 
 
 def get_dump_manager(key) -> CacheManager:
+    """
+    Get a cache manager for the given key with dump enabled.
+    """
     cls = knobs.cache.manager_class or FileCacheManager
     return cls(_base32(key), dump=True)
 
 
 def make_so_cache_key(version_hash, signature, constants, ids, **kwargs):
+    """
+    Get a unique key for the compiled code.
+    """
     # Get unique key for the compiled code
     signature = {k: 'ptr' if v[0] == '*' else v for k, v in signature.items()}
     key = f"{version_hash}-{''.join(signature.values())}-{constants}-{ids}"
@@ -282,7 +355,10 @@ def make_so_cache_key(version_hash, signature, constants, ids, **kwargs):
 
 
 @functools.lru_cache()
-def triton_key():
+def tileon_key():
+    """
+    Get a unique key for the Tileon code.
+    """
     import pkgutil
     TRITON_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     contents = []
@@ -291,8 +367,8 @@ def triton_key():
         contents += [hashlib.sha256(f.read()).hexdigest()]
     # compiler
     path_prefixes = [
-        (os.path.join(TRITON_PATH, "compiler"), "triton.compiler."),
-        (os.path.join(TRITON_PATH, "backends"), "triton.backends."),
+        (os.path.join(TRITON_PATH, "compiler"), "tileon.compiler."),
+        (os.path.join(TRITON_PATH, "backends"), "tileon.backends."),
     ]
     for path, prefix in path_prefixes:
         for lib in pkgutil.walk_packages([path], prefix=prefix):
@@ -302,21 +378,24 @@ def triton_key():
     # backend
     libtriton_hash = hashlib.sha256()
     ext = sysconfig.get_config_var("EXT_SUFFIX").split(".")[-1]
-    with open(os.path.join(TRITON_PATH, "_C", f"libtriton.{ext}"), "rb") as f:
+    with open(os.path.join(TRITON_PATH, "_C", f"{ext}"), "rb") as f:
         while True:
             chunk = f.read(1024**2)
             if not chunk:
                 break
             libtriton_hash.update(chunk)
     contents.append(libtriton_hash.hexdigest())
-    # language
+
     language_path = os.path.join(TRITON_PATH, 'language')
-    for lib in pkgutil.walk_packages([language_path], prefix="triton.language."):
+    for lib in pkgutil.walk_packages([language_path], prefix="tileon.language."):
         with open(lib.module_finder.find_spec(lib.name).origin, "rb") as f:
             contents += [hashlib.sha256(f.read()).hexdigest()]
     return f'{__version__}' + '-'.join(contents)
 
 
 def get_cache_key(src, backend, backend_options, env_vars):
-    key = f"{triton_key()}-{src.hash()}-{backend.hash()}-{backend_options.hash()}-{str(sorted(env_vars.items()))}"
+    """
+    Get a unique key for the cache.
+    """
+    key = f"{tileon_key()}-{src.hash()}-{backend.hash()}-{backend_options.hash()}-{str(sorted(env_vars.items()))}"
     return key

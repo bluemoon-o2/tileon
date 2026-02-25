@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Callable
+
 from .jit import KernelInterface
 
 
@@ -7,33 +9,31 @@ class Config:
     """
     An object that represents a possible kernel configuration for the auto-tuner to try.
 
-    :ivar kwargs: a dictionary of meta-parameters to pass to the kernel as keyword arguments.
-    :type kwargs: dict[Str, Any]
-    :ivar num_warps: the number of warps to use for the kernel when compiled for GPUs. For example, if
+    Attributes:
+        kwargs: a dictionary of meta-parameters to pass to the kernel as keyword arguments.
+        num_warps: the number of warps to use for the kernel when compiled for GPUs. For example, if
                       `num_warps=8`, then each kernel instance will be automatically parallelized to
                       cooperatively execute using `8 * 32 = 256` threads.
-    :type num_warps: int
-    :ivar num_stages: the number of stages that the compiler should use when software-pipelining loops.
+        num_stages: the number of stages that the compiler should use when software-pipelining loops.
                        Mostly useful for matrix multiplication workloads on SM80+ GPUs.
-    :type num_stages: int
-    :ivar num_ctas: number of blocks in a block cluster. SM90+ only.
-    :type num_ctas: int
-    :type maxnreg: Optional[int]
-    :ivar maxnreg: maximum number of registers one thread can use.  Corresponds
+        num_ctas: number of blocks in a block cluster. SM90+ only.
+        maxnreg: maximum number of registers one thread can use.  Corresponds
                        to ptx .maxnreg directive.  Not supported on all platforms.
-    :ivar pre_hook: a function that will be called before the kernel is called. Parameters of this
+        pre_hook: a function that will be called before the kernel is called. Parameters of this
                     function are args.
-    :ivar ir_override: filename of a user-defined IR (*.{ttgir|llir|ptx|amdgcn}).
+        ir_override: filename of a user-defined IR (*.{ttgir|llir|ptx|amdgcn}).
     """
 
-    def __init__(self,
-                 kwargs,
-                 num_warps=4,
-                 num_stages=3,
-                 num_ctas=1,
-                 maxnreg=None,
-                 pre_hook=None,
-                 ir_override=None):
+    def __init__(
+        self,
+        kwargs,
+        num_warps: int = 4,
+        num_stages: int = 3,
+        num_ctas: int = 1,
+        maxnreg: int = None,
+        pre_hook: Callable = None,
+        ir_override=None
+    ):
         self.kwargs = kwargs
         self.num_warps = num_warps
         self.num_ctas = num_ctas
@@ -92,6 +92,15 @@ class Config:
 
 
 class Heuristics(KernelInterface):
+    """
+    A wrapper for a kernel function that specifies how to compute the values of certain meta-parameters.
+
+    Args:
+        fn: the kernel function to wrap.
+        arg_names: the names of the positional arguments of the kernel function.
+        values: a dictionary of meta-parameter names and functions that compute the value of the meta-parameter.
+               each such function takes a list of positional arguments as input.
+    """
 
     def __init__(self, fn, arg_names, values):
         self.fn = fn
@@ -109,17 +118,16 @@ def heuristics(values):
     Decorator for specifying how the values of certain meta-parameters may be computed.
     This is useful for cases where auto-tuning is prohibitively expensive, or just not applicable.
 
-    .. highlight:: python
-    .. code-block:: python
-
+    Example:
         # smallest power-of-two >= x_size
         @tileon.heuristics(values={'BLOCK_SIZE': lambda args: tileon.next_power_of_2(args['x_size'])})
         @tileon.jit
         def kernel(x_ptr, x_size, BLOCK_SIZE: tl.constexpr):
             ...
-    :param values: a dictionary of meta-parameter names and functions that compute the value of the meta-parameter.
-                   each such function takes a list of positional arguments as input.
-    :type values: dict[str, Callable[[dict[str, Any]], Any]]
+    
+    Args:
+        values: a dictionary of meta-parameter names and functions that compute the value of the meta-parameter.
+               each such function takes a list of positional arguments as input.
     """
 
     def decorator(fn):

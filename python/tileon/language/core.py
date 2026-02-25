@@ -824,10 +824,9 @@ class block_t(dtype):
         """
         self.element_t = element_t
 
-        assert (isinstance(
+        assert isinstance(
             shape, (list, tuple)
         ), f'shape has type `{type(shape).__name__}`; expected `list` or `tuple`.'
-                )
 
         # shape can be empty ([]) when an input is a 0D tensor.
         self.shape = tuple(_unwrap_shape(shape))
@@ -1377,20 +1376,20 @@ class tensor(_value):
 
     @builtin
     def __lshift__(self, other, _semantic=None):
-        check_bit_width(self, other)
         other = _unwrap_if_constexpr(other)
+        check_bit_width(self, other)
         return _semantic.shl(self, other)
 
     @builtin
     def __rlshift__(self, other, _semantic=None):
-        check_bit_width(other, self)
         other = _unwrap_if_constexpr(other)
+        check_bit_width(other, self)
         return _semantic.shl(other, self)
 
     @builtin
     def __rshift__(self, other, _semantic=None):
-        check_bit_width(self, other)
         other = _unwrap_if_constexpr(other)
+        check_bit_width(self, other)
         if self.dtype.is_int_signed():
             return _semantic.ashr(self, other)
         else:
@@ -1398,8 +1397,8 @@ class tensor(_value):
 
     @builtin
     def __rrshift__(self, other, _semantic=None):
-        check_bit_width(other, self)
         other = _unwrap_if_constexpr(other)
+        check_bit_width(other, self)
         if self.dtype.is_int_signed():
             return _semantic.ashr(other, self)
         else:
@@ -1716,9 +1715,9 @@ def check_bit_width(value, shift_value):
         shift_value: The shift value.
     """
     bitwidth = value.type.scalar.primitive_bitwidth
-    if shift_value.value >= bitwidth:
+    if shift_value >= bitwidth:
         warnings.warn(
-            f"Value {shift_value.value} exceeds the maximum bitwidth ({bitwidth}) "
+            f"Value {shift_value} exceeds the maximum bitwidth ({bitwidth}) "
             f"for type '{value.dtype}'. This may result in undefined behavior."
         )
 

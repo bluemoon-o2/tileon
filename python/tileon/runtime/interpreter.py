@@ -3,7 +3,6 @@ import ast
 import math
 import textwrap
 import inspect
-import threading
 from functools import partial
 from typing import Tuple, List, Dict, Callable, TypeVar, Optional, Any
 
@@ -486,31 +485,6 @@ class InterpreterBuilder:
         self.codegen_fns = {}
         self.codegen_fns["convert_custom_types"] = _convert_custom_types
         self.codegen_fns["min_dot_size"] = lambda lhsType, rhsType: (1, 1, 1)
-        self._local = threading.local()
-        self._grid_dim = (1, 1, 1)
-        self._vectorized_nx = None
-
-    def set_vectorized_grid(self, nx):
-        self._vectorized_nx = nx
-        
-    def clear_vectorized_grid(self):
-        self._vectorized_nx = None
-
-    @property
-    def grid_idx(self):
-        return self._local.grid_idx
-
-    @grid_idx.setter
-    def grid_idx(self, value):
-        self._local.grid_idx = value
-
-    @property
-    def grid_dim(self):
-        return self._grid_dim
-
-    @grid_dim.setter
-    def grid_dim(self, value):
-        self._grid_dim = value
 
     def set_grid_idx(self, x: int, y: int, z: int):
         if not x < self.grid_dim[0]:
@@ -633,13 +607,6 @@ class InterpreterBuilder:
         Returns:
             TensorHandle: The ID of the current program in the given axis.
         """
-        if self._vectorized_nx is not None:
-            if axis == 0:
-                # Return (N, 1) array for broadcasting
-                return TensorHandle(np.arange(self._vectorized_nx, dtype=np.int32)[:, None], tl.int32)
-            else:
-                return TensorHandle(np.array([0], dtype=np.int32), tl.int32)
-
         if self.grid_idx is None:
             raise ValueError("grid_idx is None")
         return TensorHandle(np.array([self.grid_idx[axis]], dtype=np.int32), tl.int32)
@@ -1055,9 +1022,9 @@ class InterpreterBuilder:
         """
         return TensorHandle(arg.data.reshape(shape), arg.dtype.scalar)
 
-    def create_trans(self, arg, perm):
+    def create_transpose(self, arg, perm):
         """
-        Tileon's trans instruction transposes the input tensor along the specified axes.
+        Tileon's transpose instruction transposes the input tensor along the specified axes.
 
         Args:
             arg (TensorHandle): The input tensor.
@@ -1313,13 +1280,6 @@ class InterpreterBuilder:
             TensorHandle: The splatted tensor.
         """
         shape = ret_ty.shape
-        if self._vectorized_nx is not None:
-             target_shape = (self._vectorized_nx, *shape)
-             try:
-                 return TensorHandle(np.broadcast_to(arg.data, target_shape), arg.dtype.scalar)
-             except ValueError:
-                 pass
-
         if isinstance(arg.dtype, tl.block_t):
             return TensorHandle(np.full(shape, arg.data[0], dtype=_get_np_dtype(arg.dtype)), arg.dtype.scalar)
         else:  # scalar
@@ -2290,20 +2250,13 @@ class GridExecutor:
             assert len(grid) <= 3, "grid must have at most 3 dimensions"
             grid = grid + (1, ) * (3 - len(grid))
 
-            if grid[1] == 1 and grid[2] == 1:
-                interpreter_builder.set_vectorized_grid(grid[0])
-                try:
-                    self.fn(**args)
-                finally:
-                    interpreter_builder.clear_vectorized_grid()
-            else:
-                interpreter_builder.set_grid_dim(*grid)
-                try:
-                    _interpreter.parallel_launch(lambda: self.fn(**args), list(grid), interpreter_builder)
-                except Exception as e:
-                    if knobs.runtime.debug:
-                        raise
-                    raise InterpreterError(repr(e)) from e
+            interpreter_builder.set_grid_dim(*grid)
+            try:
+                _interpreter.parallel_launch(lambda: self.fn(**args), list(grid), interpreter_builder)
+            except Exception as e:
+                if knobs.runtime.debug:
+                    raise
+                raise InterpreterError(repr(e)) from e
         finally:
             patch_scope.restore()
         # copy arguments back to propagate side-effects

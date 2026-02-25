@@ -67,9 +67,9 @@ print(f'The maximum difference between torch and triton is '
         x_vals=[2**i for i in range(12, 16, 1)] if tileon.knobs.runtime.interpret else [2**i for i in range(12, 28, 1)],
         x_log=True,
         line_arg='provider',
-        line_vals=['tileon', 'torch'], 
-        line_names=['Tileon', 'Torch'],
-        styles=[('blue', '-'), ('green', '-')],
+        line_vals=['tileon', 'torch', 'numpy'], 
+        line_names=['Tileon', 'Torch', 'NumPy'],
+        styles=[('blue', '-'), ('green', '-'), ('red', '-')],
         ylabel='GB/s',
         plot_name='vector-add-performance',
         args={},
@@ -83,8 +83,10 @@ def benchmark(size, provider):
         ms, min_ms, max_ms = tileon.testing.do_bench(lambda: x + y, quantiles=quantiles)
     if provider == 'tileon':
         ms, min_ms, max_ms = tileon.testing.do_bench(lambda: add(x, y), quantiles=quantiles)
+    if provider == 'numpy':
+        ms, min_ms, max_ms = tileon.testing.do_bench(lambda: x.numpy() + y.numpy(), quantiles=quantiles)
     gbps = lambda ms: 3 * x.numel() * x.element_size() * 1e-9 / (ms * 1e-3)
     return gbps(ms), gbps(max_ms), gbps(min_ms)
 
 
-benchmark.run(print_data=True, save_path=os.path.join(os.path.dirname(__file__), 'figures'))
+benchmark.run(print_data=True, save_path=os.path.join(os.path.dirname(__file__), 'figures', 'add'))

@@ -17,14 +17,19 @@ from .cache import get_cache_manager
 from .. import knobs
 
 
-def _build(name: str, src: str, srcdir: str, library_dirs: list[str],
-           include_dirs: list[str], libraries: list[str],
-           ccflags: list[str]) -> str:
+def _build(
+    name: str,
+    src: str,
+    srcdir: str,
+    library_dirs: list[str],
+    include_dirs: list[str],
+    libraries: list[str],
+    ccflags: list[str] = [],
+) -> str:
     if impl := knobs.build.impl:
         return impl(name, src, srcdir, library_dirs, include_dirs, libraries)
     suffix = sysconfig.get_config_var('EXT_SUFFIX')
-    so = os.path.join(srcdir, '{name}{suffix}'.format(name=name,
-                                                      suffix=suffix))
+    so = os.path.join(srcdir, '{name}{suffix}'.format(name=name, suffix=suffix))
     cc = os.environ.get("CC")
     if cc is None:
         clang = shutil.which("clang")
@@ -55,7 +60,12 @@ def _build(name: str, src: str, srcdir: str, library_dirs: list[str],
 
 
 def _library_flag(lib: str) -> str:
-    # Match .so files with optional version numbers (e.g., .so, .so.1, .so.513.50.1)
+    """
+    Returns the linker flag for the given library name.
+
+    If the library is a shared library (ends with .so or .so.*), it returns -l:lib.
+    Otherwise, it returns -llib.
+    """
     if re.search(r'\.so(\.\d+)*$', lib) or lib.endswith(".a"):
         return f"-l:{lib}"
     return f"-l{lib}"
@@ -63,11 +73,21 @@ def _library_flag(lib: str) -> str:
 
 @functools.lru_cache
 def platform_key() -> str:
+    """
+    Returns a unique key for the current platform.
+
+    The key is a comma-separated string of the machine, system, and architecture.
+    """
     from platform import machine, system, architecture
     return ",".join([machine(), system(), *architecture()])
 
 
 def _load_module_from_path(name: str, path: str) -> ModuleType:
+    """
+    Loads a module from the given path.
+
+    If the module cannot be loaded, a RuntimeError is raised.
+    """
     spec = importlib.util.spec_from_file_location(name, path)
     if not spec or not spec.loader:
         raise RuntimeError(f"Failed to load newly compiled {name} from {path}")
@@ -76,12 +96,22 @@ def _load_module_from_path(name: str, path: str) -> ModuleType:
     return mod
 
 
-def compile_module_from_src(src: str,
-                            name: str,
-                            library_dirs: list[str] | None = None,
-                            include_dirs: list[str] | None = None,
-                            libraries: list[str] | None = None,
-                            ccflags: list[str] | None = None) -> ModuleType:
+def compile_module_from_src(
+    src: str,
+    name: str,
+    library_dirs: list[str] | None = None,
+    include_dirs: list[str] | None = None,
+    libraries: list[str] | None = None,
+    ccflags: list[str] | None = None,
+) -> ModuleType:
+    """
+    Compiles the given source code into a module.
+
+    The module is cached in the cache directory. If the module already exists in the cache,
+    it is loaded from the cache. Otherwise, it is compiled and cached.
+
+    If the module cannot be loaded from the cache or compiled, a RuntimeError is raised.
+    """
     key = hashlib.sha256((src + platform_key()).encode("utf-8")).hexdigest()
     cache = get_cache_manager(key)
     suffix = sysconfig.get_config_var("EXT_SUFFIX")
@@ -92,16 +122,16 @@ def compile_module_from_src(src: str,
             return _load_module_from_path(name, cache_path)
         except (RuntimeError, ImportError):
             log = logging.getLogger(__name__)
-            log.warning(
-                f"Triton cache error: compiled module {name}.so could not be loaded"
-            )
+            log.warning(f"Tileon cache error: compiled module {name}.so could not be loaded")
 
     with tempfile.TemporaryDirectory() as tmpdir:
         src_path = os.path.join(tmpdir, name + ".c")
         with open(src_path, "w") as f:
             f.write(src)
-        so = _build(name, src_path, tmpdir, library_dirs or [], include_dirs
-                    or [], libraries or [], ccflags or [])
+        so = _build(
+            name, src_path, tmpdir, library_dirs or [], include_dirs or [],
+            libraries or [], ccflags or []
+        )
         with open(so, "rb") as f:
             cache_path = cache.put(f.read(), f"{name}{suffix}", binary=True)
 

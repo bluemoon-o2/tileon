@@ -2,7 +2,7 @@ from ..runtime.jit import jit
 from . import core as tl
 from . import math
 
-N_ROUNDS_DEFAULT = tl.constexpr(10)  # Default number of rounds for philox
+N_ROUNDS_DEFAULT = tl.constexpr(10)
 
 # -------------------
 # randint
@@ -10,13 +10,15 @@ N_ROUNDS_DEFAULT = tl.constexpr(10)  # Default number of rounds for philox
 
 
 @jit
-def philox_impl(c0,
-                c1,
-                c2,
-                c3,
-                k0,
-                k1,
-                n_rounds: tl.constexpr = N_ROUNDS_DEFAULT):
+def philox_impl(
+    c0,
+    c1,
+    c2,
+    c3,
+    k0,
+    k1,
+    n_rounds: tl.constexpr = N_ROUNDS_DEFAULT
+):
     """
     Run `n_rounds` rounds of Philox for state (c0, c1, c2, c3) and key (k0, k1).
     """
@@ -26,8 +28,7 @@ def philox_impl(c0,
         PHILOX_ROUND_A: tl.constexpr = 0xD2511F53
         PHILOX_ROUND_B: tl.constexpr = 0xCD9E8D57
     else:
-        tl.static_assert(c0.dtype == tl.uint64,
-                         "dtype not supported in philox_impl")
+        tl.static_assert(c0.dtype == tl.uint64, "dtype not supported in philox_impl")
         PHILOX_KEY_A: tl.constexpr = 0x9E3779B97F4A7C15
         PHILOX_KEY_B: tl.constexpr = 0xBB67AE8584CAA73B
         PHILOX_ROUND_A: tl.constexpr = 0xD2E7470EE14C6C93
@@ -51,6 +52,9 @@ def philox_impl(c0,
 
 @jit
 def philox(seed, c0, c1, c2, c3, n_rounds: tl.constexpr = N_ROUNDS_DEFAULT):
+    """
+    Run `n_rounds` rounds of Philox for state (c0, c1, c2, c3) and seed `seed`.
+    """
     seed = tl.to_tensor(seed)
     tl.static_assert(seed.dtype.is_int())
     seed = seed.to(tl.uint64)
@@ -66,7 +70,8 @@ def philox(seed, c0, c1, c2, c3, n_rounds: tl.constexpr = N_ROUNDS_DEFAULT):
     else:
         tl.static_assert(
             tl.constexpr(c0.dtype.primitive_bitwidth) == 64,
-            "bitwidth not supported in philox")
+            "bitwidth not supported in philox"
+        )
         int_dtype = tl.uint64
         seed_hi = tl.full((1, ), 0, dtype=int_dtype)
         seed_lo = seed
@@ -87,8 +92,9 @@ def randint(seed, offset, n_rounds: tl.constexpr = N_ROUNDS_DEFAULT):
     If you need multiple streams of random numbers,
     using `randint4x` is likely to be faster than calling `randint` 4 times.
 
-    :param seed: The seed for generating random numbers.
-    :param offset: The offsets to generate random numbers for.
+    Args:
+        seed: The seed for generating random numbers.
+        offset: The offsets to generate random numbers for.
     """
     ret, _, _, _ = randint4x(seed, offset, n_rounds)
     return ret
@@ -101,10 +107,11 @@ def randint4x(seed, offset, n_rounds: tl.constexpr = N_ROUNDS_DEFAULT):
     blocks of random :code:`int32`.
 
     This is the maximally efficient entry point
-    to Triton's Philox pseudo-random number generator.
+    to Tileon's Philox pseudo-random number generator.
 
-    :param seed: The seed for generating random numbers.
-    :param offsets: The offsets to generate random numbers for.
+    Args:
+        seed: The seed for generating random numbers.
+        offsets: The offsets to generate random numbers for.
     """
     # _0 = tl.zeros(offset.shape, offset.dtype)
 
