@@ -1,6 +1,6 @@
 <div align="center">
     <p>
-        <img src="./assets/tileon-logo.png" alt="Tileon" width="200">
+        <img src=".docs/assets/tileon-logo.png" alt="Tileon" width="200">
     </p>
 
 <!-- Language Switch -->
