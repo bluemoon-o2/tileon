@@ -1,6 +1,6 @@
 <div align="center">
     <p>
-        <img src=".docs/assets/tileon-logo.png" alt="Tileon" width="200">
+        <img src="./docs/assets/tileon-logo.png" alt="Tileon" width="200">
     </p>
 
 <!-- Language Switch -->
@@ -8,7 +8,7 @@
     <a href="./README.md">
         <img src="https://img.shields.io/badge/English-🇺🇸-yellow?style=flat-square" alt="English">
     </a>
-    <a href="./docs/index.zh.md">
+    <a href="./README.zh.md">
         <img src="https://img.shields.io/badge/中文-🇨🇳-blue?style=flat-square" alt="中文">
     </a>
 </p>
