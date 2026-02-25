@@ -35,7 +35,7 @@
 </h3>
 
 <p>
-    <a href="https://tensorplay.cn/tileon/"><strong>📚 文档</strong></a> •
+    <a href="https://bluemoon-o2.github.io/tileon/"><strong>📚 文档</strong></a> •
     <a href="#-快速开始"><strong>🚀 快速开始</strong></a> •
     <a href="#-特性"><strong>✨ 特性</strong></a> •
     <a href="#-支持的操作"><strong>⚡ 操作</strong></a>
@@ -184,5 +184,5 @@ Tileon 基于 MIT 许可证授权。详见 [LICENSE](LICENSE.md)。
 ---
 
 <div align="center">
-    <sub>用 ❤️ 为 AI 学习社区构建 • <a href="https://tensorplay.cn/tileon/">Tileon</a></sub>
+    <sub>用 ❤️ 为 AI 学习社区构建 • <a href="https://bluemoon-o2.github.io/tileon">Tileon</a></sub>
 </div>

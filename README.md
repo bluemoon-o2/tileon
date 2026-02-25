@@ -35,7 +35,7 @@
 </h3>
 
 <p>
-    <a href="https://tensorplay.cn/tileon/"><strong>📚 Docs</strong></a> •
+    <a href="https://bluemoon-o2.github.io/tileon/"><strong>📚 Docs</strong></a> •
     <a href="#-quick-start"><strong>🚀 Quick Start</strong></a> •
     <a href="#-features"><strong>✨ Features</strong></a> •
     <a href="#-supported-operations"><strong>⚡ Operations</strong></a>
@@ -184,5 +184,5 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for mor
 ---
 
 <div align="center">
-    <sub>Built with ❤️ for the AI Learning Community • <a href="https://tensorplay.cn/tileon/">Tileon</a></sub>
+    <sub>Built with ❤️ for the AI Learning Community • <a href="https://bluemoon-o2.github.io/tileon">Tileon</a></sub>
 </div>
